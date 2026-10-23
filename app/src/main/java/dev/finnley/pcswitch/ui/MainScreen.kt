@@ -1,6 +1,10 @@
 package dev.finnley.pcswitch.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,10 +21,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +47,7 @@ fun MainScreen(
     Column(
         Modifier
             .fillMaxSize()
+            .background(Bg)
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
@@ -59,15 +64,14 @@ fun MainScreen(
                 Text("v${BuildConfig.VERSION_NAME}", fontSize = 11.sp, color = InkSoft)
             }
             state.updateAvailable?.let { up ->
-                Surface(
-                    onClick = { onUpdate() },
-                    shape = RoundedCornerShape(999.dp),
-                    color = Paper
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Accent.copy(alpha = 0.2f))
+                        .clickable { onUpdate() }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Row(
-                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         StatusDot(Warn)
                         Spacer(Modifier.width(6.dp))
                         Text(
@@ -85,27 +89,31 @@ fun MainScreen(
         }
         Spacer(Modifier.height(22.dp))
 
-        // ---------- Status ----------
-        val dot = when (state.mode) {
-            Mode.HomeLan, Mode.HomeVpn -> Ok
-            Mode.Remote, Mode.Connecting -> Warn
-            Mode.Offline -> Err
-        }
-        val label = when (state.mode) {
-            Mode.HomeLan -> "Verbunden · Heimnetz (WLAN)"
-            Mode.HomeVpn -> "Verbunden · Heimnetz per VPN"
-            Mode.Remote -> "Remote · Tailscale-Relay"
-            Mode.Connecting -> "Verbinde Heimnetz…"
-            Mode.Offline -> "Offline"
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusDot(dot)
-            Spacer(Modifier.width(8.dp))
-            Text(label, fontSize = 15.sp, color = Ink, fontWeight = FontWeight.Medium)
-        }
-        if (state.statusNote.isNotBlank()) {
-            Spacer(Modifier.height(4.dp))
-            Text(state.statusNote, fontSize = 12.sp, color = InkSoft)
+        // ---------- Status Card (Glassmorphism) ----------
+        GlassCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                val dot = when (state.mode) {
+                    Mode.HomeLan, Mode.HomeVpn -> Ok
+                    Mode.Remote, Mode.Connecting -> Accent
+                    Mode.Offline -> Err
+                }
+                val label = when (state.mode) {
+                    Mode.HomeLan -> "Verbunden · Heimnetz (WLAN)"
+                    Mode.HomeVpn -> "Verbunden · Heimnetz per VPN"
+                    Mode.Remote -> "Remote · Tailscale-Relay"
+                    Mode.Connecting -> "Verbinde Heimnetz…"
+                    Mode.Offline -> "Offline"
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusDot(dot)
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, fontSize = 15.sp, color = Ink, fontWeight = FontWeight.Medium)
+                }
+                if (state.statusNote.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(state.statusNote, fontSize = 12.sp, color = InkSoft)
+                }
+            }
         }
         Spacer(Modifier.height(18.dp))
 
@@ -154,7 +162,12 @@ fun MainScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("v${BuildConfig.VERSION_NAME}", fontSize = 11.sp, color = InkSoft)
-            TextButton(onClick = onSettings) {
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onSettings() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
                 Text("Einstellungen", fontSize = 12.sp, color = InkSoft)
             }
         }
@@ -166,16 +179,16 @@ private fun VpnButton(text: String, accent: Boolean, busy: Boolean, onClick: () 
     Button(
         onClick = onClick,
         enabled = !busy,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = if (accent) {
             ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
         } else {
             ButtonDefaults.outlinedButtonColors(contentColor = Ink)
         },
         border = if (accent) {
-            androidx.compose.foundation.BorderStroke(0.dp, Color.Transparent)
+            BorderStroke(0.dp, Color.Transparent)
         } else {
-            androidx.compose.foundation.BorderStroke(1.5.dp, Line)
+            BorderStroke(1.5.dp, Line)
         },
         contentPadding = PaddingValues(vertical = 16.dp),
         modifier = Modifier.fillMaxWidth()

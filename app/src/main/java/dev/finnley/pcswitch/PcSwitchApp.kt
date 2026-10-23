@@ -7,16 +7,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import dev.finnley.pcswitch.state.PcSwitchViewModel
 import dev.finnley.pcswitch.ui.Accent
+import dev.finnley.pcswitch.ui.Bg
 import dev.finnley.pcswitch.ui.Ink
 import dev.finnley.pcswitch.ui.MainScreen
-import dev.finnley.pcswitch.ui.Paper
 import dev.finnley.pcswitch.ui.SetupScreen
 
 @Composable
 fun PcSwitchApp(vm: PcSwitchViewModel) {
     val state by vm.state.collectAsState()
     MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Accent)) {
-        Surface(color = Paper, contentColor = Ink) {
+        Surface(color = Bg, contentColor = Ink) {
             if (state.inSetup) {
                 SetupScreen(
                     initial = vm.settings,
@@ -24,6 +24,7 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     updateChecking = false,
                     updateAvailable = state.updateAvailable,
                     onSave = vm::saveSetup,
+                    onBack = vm::closeSetup,
                     onCheckUpdate = vm::checkForUpdate
                 )
             } else {

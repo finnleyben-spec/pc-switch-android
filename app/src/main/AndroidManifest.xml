@@ -14,7 +14,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/AppTheme">
 
         <!-- FileProvider: content://-URI für die temporäre Update-APK -->
         <provider

@@ -161,6 +161,10 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(inSetup = true) }
     }
 
+    fun closeSetup() {
+        _state.update { it.copy(inSetup = false) }
+    }
+
     // ---------- Self-Update ----------
 
     fun checkForUpdate() {
