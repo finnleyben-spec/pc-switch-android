@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.webkit.SslErrorHandler
 import android.webkit.WebResourceRequest
+import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -98,6 +99,16 @@ class MainActivity : Activity() {
         }
 
         setContentView(web)
+
+        // Self-Update, deterministischer Pfad: Die PWA ruft im APK-Modus das
+        // JavascriptInterface auf (statt zu navigieren). Kein Service-Worker-
+        // Timing, kein DownloadListener — die APK-URL kommt direkt hier an.
+        web.addJavascriptInterface(object {
+            @JavascriptInterface
+            fun startApkDownload(url: String) {
+                downloadAndInstallApk(url)
+            }
+        }, "PcSwitch")
 
         val deepLink = intent?.dataString
         if (savedInstanceState == null) {
