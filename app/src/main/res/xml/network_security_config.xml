@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <!-- Lokale CA des HA-Proxys (stormlinux.ts.net) -->
+            <certificates src="@raw/pcca" />
+        </trust-anchors>
+    </base-config>
+    <!-- HA-Host im LAN: ws:// für "Zu Hause"-Modus (PC-Aus-Wake) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">192.168.0.205</domain>
+    </domain-config>
+</network-security-config>
