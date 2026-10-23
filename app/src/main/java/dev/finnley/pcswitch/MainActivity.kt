@@ -70,8 +70,19 @@ class MainActivity : Activity() {
                 }
             }
 
-            // Alle Links in der App halten (keine fremden Browser-Apps)
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
+            // Alle Links in der App halten (keine fremden Browser-Apps).
+            // Self-Update: APK-URL hier abfangen — VOR dem Service Worker.
+            // location.href auf die .apk-URL würde sonst von sw.js interceptet
+            // (respondWith) und der DownloadListener würde nie feuern.
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val url = request.url.toString()
+                if (url.substringBefore('?').endsWith(".apk", ignoreCase = true)) {
+                    view.stopLoading()
+                    downloadAndInstallApk(url)
+                    return true
+                }
+                return false
+            }
         }
 
         // Self-Update: PWA setzt location.href auf die APK-URL aus version.json.
