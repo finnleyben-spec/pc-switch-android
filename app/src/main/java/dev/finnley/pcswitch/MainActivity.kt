@@ -67,7 +67,11 @@ class MainActivity : Activity() {
 
         val deepLink = intent?.dataString
         if (savedInstanceState == null) {
-            web.loadUrl(deepLink ?: DEFAULT_URL)
+            // Lokale Version in die PWA injizieren: der Update-Button in der App
+            // vergleicht version_code mit version.json (GitHub Pages).
+            val base = deepLink ?: DEFAULT_URL
+            val sep = if (base.contains("?")) "&" else "?"
+            web.loadUrl("$base${sep}apk=${BuildConfig.VERSION_NAME}&vc=${BuildConfig.VERSION_CODE}")
         }
     }
 
