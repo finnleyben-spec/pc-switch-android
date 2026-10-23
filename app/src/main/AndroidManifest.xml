@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- VPN-Transport-Erkennung (HomeLan vs. HomeVpn) -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Self-Update: System-Installer für die heruntergeladene APK aufrufen -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
