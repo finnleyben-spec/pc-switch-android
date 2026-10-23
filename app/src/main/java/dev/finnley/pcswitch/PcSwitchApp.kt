@@ -5,11 +5,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import dev.finnley.pcswitch.state.PcSwitchViewModel
 import dev.finnley.pcswitch.ui.Accent
 import dev.finnley.pcswitch.ui.Bg
 import dev.finnley.pcswitch.ui.Ink
 import dev.finnley.pcswitch.ui.MainScreen
+import dev.finnley.pcswitch.ui.SettingsScreen
 import dev.finnley.pcswitch.ui.SetupScreen
 
 @Composable
@@ -28,6 +31,20 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     onCheckUpdate = vm::checkForUpdate,
                     onDownloadUpdate = vm::downloadUpdate
                 )
+            } else if (state.inSettings) {
+                SettingsScreen(
+                    updateChecking = state.updateChecking,
+                    updateAvailable = state.updateAvailable?.versionName,
+                    updateNotes = state.updateAvailable?.notes,
+                    downloadProgress = state.downloadProgress,
+                    downloadFailed = state.downloadFailed,
+                    hasPreviousVersion = vm.hasPreviousVersion(),
+                    onBack = vm::closeSettings,
+                    onCheckUpdate = vm::checkForUpdate,
+                    onDownloadUpdate = vm::downloadUpdate,
+                    onRetryDownload = vm::retryDownload,
+                    onRollback = vm::rollback
+                )
             } else {
                 MainScreen(
                     state = state,
@@ -35,7 +52,7 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     onDisconnect = vm::disconnectHome,
                     onPressOn = vm::pressOn,
                     onPressOff = vm::pressOff,
-                    onSettings = vm::openSetup,
+                    onSettings = vm::openSettings,
                     onUpdate = vm::downloadUpdate
                 )
             }

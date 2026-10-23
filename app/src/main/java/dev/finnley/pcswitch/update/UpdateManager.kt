@@ -134,4 +134,37 @@ class UpdateManager(private val ctx: Context) {
     companion object {
         const val VERSION_URL = "https://finnleyben-spec.github.io/pc-switch/version.json"
     }
+
+    fun savePreviousVersion() {
+        try {
+            val dir = File(ctx.filesDir, "apk").apply { mkdirs() }
+            val previous = File(dir, "previous.apk")
+            // Find the current APK file (not the new download)
+            val current = ctx.applicationInfo.sourceDir
+            if (current != null && !current.contains("previous.apk")) {
+                android.util.Log.d("UpdateManager", "Saving previous version from: $current")
+                if (previous.exists()) previous.delete()
+                java.io.File(current).copyTo(previous, false)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UpdateManager", "Failed to save previous version", e)
+        }
+    }
+
+    fun getPreviousVersion(): File? {
+        try {
+            val dir = File(ctx.filesDir, "apk").apply { mkdirs() }
+            val previous = File(dir, "previous.apk")
+            if (previous.exists()) {
+                return previous
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UpdateManager", "Failed to get previous version", e)
+        }
+        return null
+    }
+
+    fun hasPreviousVersion(): Boolean {
+        return getPreviousVersion() != null
+    }
 }

@@ -30,6 +30,7 @@ sealed class Mode {
 
 data class UiState(
     val inSetup: Boolean = false,
+    val inSettings: Boolean = false,
     val mode: Mode = Mode.Offline,
     val vpnBusy: Boolean = false,
     val onState: String = "unknown",
@@ -38,6 +39,7 @@ data class UiState(
     val updateAvailable: UpdateManager.UpdateInfo? = null,
     val updateChecking: Boolean = false,
     val downloadProgress: Int? = null,
+    val downloadFailed: Boolean = false,
     val statusNote: String = "",
 )
 
@@ -171,11 +173,19 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(inSetup = false) }
     }
 
+    fun openSettings() {
+        _state.update { it.copy(inSettings = true) }
+    }
+
+    fun closeSettings() {
+        _state.update { it.copy(inSettings = false) }
+    }
+
     // ---------- Self-Update ----------
 
     fun checkForUpdate() {
         updateJob?.cancel()
-        _state.update { it.copy(updateAvailable = null, updateChecking = true) }
+        _state.update { it.copy(updateAvailable = null, updateChecking = true, downloadFailed = false) }
         updateJob = viewModelScope.launch {
             val info = updater.check(BuildConfig.VERSION_CODE)
             _state.update { it.copy(updateAvailable = info, updateChecking = false) }
@@ -189,8 +199,10 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         val info = _state.value.updateAvailable ?: return
         if (_state.value.downloadProgress != null) return
         Toast.makeText(ctx, "Update wird heruntergeladen…", Toast.LENGTH_SHORT).show()
-        _state.update { it.copy(downloadProgress = 0) }
+        _state.update { it.copy(downloadProgress = 0, downloadFailed = false) }
         viewModelScope.launch {
+            // Save previous APK version for rollback
+            updater.savePreviousVersion()
             val file = updater.download(info) { p ->
                 _state.update { it.copy(downloadProgress = p) }
             }
@@ -200,11 +212,29 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 updater.install(file)
             } else {
                 _state.update {
-                    it.copy(downloadProgress = null, statusNote = "Download fehlgeschlagen")
+                    it.copy(downloadProgress = null, downloadFailed = true, statusNote = "Download fehlgeschlagen")
                 }
                 Toast.makeText(ctx, "Download fehlgeschlagen", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    fun retryDownload() {
+        downloadUpdate()
+    }
+
+    fun rollback() {
+        val file = updater.getPreviousVersion()
+        if (file != null) {
+            Toast.makeText(ctx, "Rollback wird installiert…", Toast.LENGTH_SHORT).show()
+            updater.install(file)
+        } else {
+            Toast.makeText(ctx, "Keine vorherige Version gefunden", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun hasPreviousVersion(): Boolean {
+        return updater.hasPreviousVersion()
     }
 
     // ---------- Probing + Sessions ----------
