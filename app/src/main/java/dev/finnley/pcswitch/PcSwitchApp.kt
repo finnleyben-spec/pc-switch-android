@@ -21,11 +21,12 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                 SetupScreen(
                     initial = vm.settings,
                     busy = false,
-                    updateChecking = false,
+                    updateChecking = state.updateChecking,
                     updateAvailable = state.updateAvailable,
                     onSave = vm::saveSetup,
                     onBack = vm::closeSetup,
-                    onCheckUpdate = vm::checkForUpdate
+                    onCheckUpdate = vm::checkForUpdate,
+                    onDownloadUpdate = vm::downloadUpdate
                 )
             } else {
                 MainScreen(

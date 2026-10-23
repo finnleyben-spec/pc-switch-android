@@ -57,6 +57,7 @@ class UpdateManager(private val ctx: Context) {
     /** Streaming-Download mit Fortschritt (0..100). @return APK-Datei oder null. */
     suspend fun download(info: UpdateInfo, progress: (Int) -> Unit): File? =
         withContext(Dispatchers.IO) {
+            android.util.Log.d("UpdateManager", "Downloading: ${info.url}")
             val dir = File(ctx.filesDir, "apk").apply { mkdirs() }
             val name = "pc-switch-${info.versionName}.apk"
             val target = File(dir, name)
@@ -64,9 +65,11 @@ class UpdateManager(private val ctx: Context) {
             try {
                 val req = Request.Builder().url(info.url).build()
                 client.newCall(req).execute().use { r ->
+                    android.util.Log.d("UpdateManager", "HTTP Status: ${r.code}")
                     if (!r.isSuccessful) return@withContext null
                     val body = r.body ?: return@withContext null
                     val total = body.contentLength().coerceAtLeast(1L)
+                    android.util.Log.d("UpdateManager", "Total size: $total")
                     tmp.outputStream().use { out ->
                         body.byteStream().use { input ->
                             val buf = ByteArray(64 * 1024)
@@ -81,10 +84,12 @@ class UpdateManager(private val ctx: Context) {
                         }
                     }
                 }
+                android.util.Log.d("UpdateManager", "Download complete, renaming to: $target")
                 if (target.exists()) target.delete()
                 tmp.renameTo(target)
                 target
             } catch (e: Exception) {
+                android.util.Log.e("UpdateManager", "Download failed", e)
                 tmp.delete()
                 null
             }
@@ -92,23 +97,37 @@ class UpdateManager(private val ctx: Context) {
 
     /** APK an den System-Installer geben (ACTION_VIEW + FileProvider). */
     fun install(file: File) {
+        android.util.Log.d("UpdateManager", "Installing: ${file.absolutePath}")
+        // Prüfe ob die App berechtigt ist, APKs zu installieren
+        if (!canInstallPackages()) {
+            android.util.Log.d("UpdateManager", "No install permission, opening settings")
+            openInstallSettings()
+            return
+        }
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
         val i = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        if (ctx.packageManager.resolveActivity(i, 0) != null) {
-            ctx.startActivity(i)
-        } else {
-            // Kein Installer gefunden → "Unbekannte App-Quellen" öffnen
-            try {
-                val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
-                ctx.startActivity(
-                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${pi.packageName}"))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
-            } catch (_: Exception) {
-            }
+        android.util.Log.d("UpdateManager", "Starting install intent")
+        ctx.startActivity(i)
+    }
+
+    private fun canInstallPackages(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            return ctx.packageManager.canRequestPackageInstalls()
+        }
+        return true
+    }
+
+    private fun openInstallSettings() {
+        try {
+            val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+            ctx.startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${pi.packageName}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: Exception) {
         }
     }
 

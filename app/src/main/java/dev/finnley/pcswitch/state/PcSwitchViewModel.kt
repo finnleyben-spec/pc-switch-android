@@ -36,6 +36,7 @@ data class UiState(
     val offState: String = "unknown",
     val lastUpdate: Long = 0,
     val updateAvailable: UpdateManager.UpdateInfo? = null,
+    val updateChecking: Boolean = false,
     val downloadProgress: Int? = null,
     val statusNote: String = "",
 )
@@ -68,6 +69,11 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 probeOnce()
                 delay(20_000)
             }
+        }
+        // Check for updates on startup
+        viewModelScope.launch {
+            delay(2000) // Wait a bit after startup
+            checkForUpdate()
         }
     }
 
@@ -169,15 +175,20 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
     fun checkForUpdate() {
         updateJob?.cancel()
+        _state.update { it.copy(updateAvailable = null, updateChecking = true) }
         updateJob = viewModelScope.launch {
             val info = updater.check(BuildConfig.VERSION_CODE)
-            _state.update { it.copy(updateAvailable = info) }
+            _state.update { it.copy(updateAvailable = info, updateChecking = false) }
+            if (info == null) {
+                Toast.makeText(ctx, "Du bist auf dem neuesten Stand", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     fun downloadUpdate() {
         val info = _state.value.updateAvailable ?: return
         if (_state.value.downloadProgress != null) return
+        Toast.makeText(ctx, "Update wird heruntergeladen…", Toast.LENGTH_SHORT).show()
         _state.update { it.copy(downloadProgress = 0) }
         viewModelScope.launch {
             val file = updater.download(info) { p ->
@@ -185,11 +196,13 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (file != null) {
                 _state.update { it.copy(downloadProgress = null) }
+                Toast.makeText(ctx, "Update wird installiert…", Toast.LENGTH_SHORT).show()
                 updater.install(file)
             } else {
                 _state.update {
                     it.copy(downloadProgress = null, statusNote = "Download fehlgeschlagen")
                 }
+                Toast.makeText(ctx, "Download fehlgeschlagen", Toast.LENGTH_LONG).show()
             }
         }
     }

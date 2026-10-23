@@ -52,7 +52,8 @@ fun SetupScreen(
     updateAvailable: UpdateManager.UpdateInfo?,
     onSave: (String, String, String, String, String, String) -> Unit,
     onBack: () -> Unit,
-    onCheckUpdate: () -> Unit
+    onCheckUpdate: () -> Unit,
+    onDownloadUpdate: () -> Unit
 ) {
     val context = LocalContext.current
     var lan by remember { mutableStateOf(initial.lanBase) }
@@ -171,6 +172,18 @@ fun SetupScreen(
                 fontSize = 11.sp,
                 color = Accent
             )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = onDownloadUpdate,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Accent,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Jetzt herunterladen", fontSize = 13.sp)
+            }
         }
         if (updateError) {
             Spacer(Modifier.height(8.dp))
