@@ -20,6 +20,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +37,8 @@ import dev.finnley.pcswitch.BuildConfig
 
 @Composable
 fun SettingsScreen(
+    lanBase: String,
+    relayBase: String,
     updateChecking: Boolean,
     updateAvailable: String?,
     updateNotes: String?,
@@ -43,12 +46,15 @@ fun SettingsScreen(
     downloadFailed: Boolean,
     hasPreviousVersion: Boolean,
     onBack: () -> Unit,
+    onSaveNetwork: (String, String) -> Unit,
     onCheckUpdate: () -> Unit,
     onDownloadUpdate: () -> Unit,
     onRetryDownload: () -> Unit,
     onRollback: () -> Unit
 ) {
     var showChangelog by remember { mutableStateOf(false) }
+    var editedLan by remember { mutableStateOf(lanBase) }
+    var editedRelay by remember { mutableStateOf(relayBase) }
 
     if (showChangelog) {
         AlertDialog(
@@ -132,6 +138,43 @@ fun SettingsScreen(
                     color = Ink,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
                 )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        // Network Settings Card
+        GlassCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                UppercaseLabel("Netzwerk")
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = editedLan,
+                    onValueChange = { editedLan = it },
+                    label = { Text("LAN-Base") },
+                    placeholder = { Text("z. B. 192.168.0.205:8123") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = editedRelay,
+                    onValueChange = { editedRelay = it },
+                    label = { Text("Relay-Base") },
+                    placeholder = { Text("z. B. 100.106.82.86") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+
+                Button(
+                    onClick = { onSaveNetwork(editedLan, editedRelay) },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Speichern", fontSize = 14.sp)
+                }
             }
         }
         Spacer(Modifier.height(20.dp))
