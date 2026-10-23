@@ -57,9 +57,10 @@ fun MainScreen(
                 Text(
                     "PC Switch",
                     fontFamily = FontFamily.Serif,
-                    fontSize = 34.sp,
+                    fontSize = 36.sp,
                     color = Ink,
-                    letterSpacing = (-0.6).sp
+                    letterSpacing = (-0.6).sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
             state.updateAvailable?.let { up ->
@@ -105,12 +106,12 @@ fun MainScreen(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatusDot(dot)
-                    Spacer(Modifier.width(8.dp))
-                    Text(label, fontSize = 15.sp, color = Ink, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.width(10.dp))
+                    Text(label, fontSize = 16.sp, color = Ink, fontWeight = FontWeight.Medium)
                 }
                 if (state.statusNote.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(state.statusNote, fontSize = 12.sp, color = InkSoft)
+                    Spacer(Modifier.height(6.dp))
+                    Text(state.statusNote, fontSize = 13.sp, color = InkSoft)
                 }
             }
         }

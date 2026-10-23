@@ -1,6 +1,7 @@
 package dev.finnley.pcswitch.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +37,7 @@ val Ok = Color(0xFF34D399)
 val Warn = Color(0xFFEAB308)
 val Err = Color(0xFFEF4444)
 
-// Glassmorphism effect using semi-transparent surfaces
+// Glassmorphism effect with subtle border, shadow, and refined corners
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
@@ -44,8 +45,15 @@ fun GlassCard(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color(0x1AFFFFFF)),
+            .shadow(
+                elevation = 8.dp,
+                spotColor = Accent.copy(alpha = 0.08f),
+                ambientColor = Color.Transparent,
+                shape = RoundedCornerShape(20.dp)
+            )
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0x0DFFFFFF))
+            .border(1.dp, Color(0x14FFFFFF), RoundedCornerShape(20.dp)),
         content = content
     )
 }
@@ -65,9 +73,9 @@ fun UppercaseLabel(text: String, color: Color = InkSoft, modifier: Modifier = Mo
     Text(
         text = text,
         color = color,
-        fontSize = 11.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.6.sp,
+        letterSpacing = 1.4.sp,
         modifier = modifier
     )
 }
@@ -98,7 +106,7 @@ fun PowerButton(
         ) {
             Text(text = if (active) "⏻" else "✕", color = if (active) Accent else Ink, fontSize = 26.sp)
         }
-        Spacer(Modifier.height(10.dp))
-        Text(label, fontSize = 22.sp, color = if (active) Color.White else Ink, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(12.dp))
+        Text(label, fontSize = 24.sp, color = if (active) Color.White else Ink, fontWeight = FontWeight.SemiBold)
     }
 }

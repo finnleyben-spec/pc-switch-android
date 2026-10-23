@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.finnley.pcswitch.BuildConfig
@@ -123,15 +124,17 @@ fun SettingsScreen(
         Text(
             "Einstellungen",
             fontFamily = FontFamily.Serif,
-            fontSize = 34.sp,
+            fontSize = 36.sp,
             color = Ink,
-            letterSpacing = (-0.6).sp
+            letterSpacing = (-0.6).sp,
+            fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.height(6.dp))
         Text(
             "App-Informationen, Netzwerk und Updates",
-            fontSize = 13.sp,
-            color = InkSoft
+            fontSize = 15.sp,
+            color = InkSoft,
+            fontWeight = FontWeight.Normal
         )
         Spacer(Modifier.height(24.dp))
 
@@ -139,12 +142,12 @@ fun SettingsScreen(
         GlassCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 UppercaseLabel("Version")
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 Text(
                     "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                    fontSize = 16.sp,
+                    fontSize = 17.sp,
                     color = Ink,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }

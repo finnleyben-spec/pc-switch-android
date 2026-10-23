@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.finnley.pcswitch.state.Settings
@@ -71,15 +72,17 @@ fun SetupScreen(
         Text(
             "PC Switch",
             fontFamily = FontFamily.Serif,
-            fontSize = 34.sp,
+            fontSize = 36.sp,
             color = Ink,
-            letterSpacing = (-0.6).sp
+            letterSpacing = (-0.6).sp,
+            fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.height(6.dp))
         Text(
             "Richte die App ein, um deinen PC zu steuern.",
-            fontSize = 13.sp,
-            color = InkSoft
+            fontSize = 15.sp,
+            color = InkSoft,
+            fontWeight = FontWeight.Normal
         )
         Spacer(Modifier.height(24.dp))
 
@@ -97,10 +100,10 @@ fun SetupScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "Erstelle in Home Assistant unter Einstellungen → Benutzer → API-Tokens",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = InkSoft
                 )
                 Spacer(Modifier.height(14.dp))
@@ -113,10 +116,10 @@ fun SetupScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "Entity ID des Power-On Buttons in Home Assistant",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = InkSoft
                 )
                 Spacer(Modifier.height(14.dp))
@@ -129,10 +132,10 @@ fun SetupScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "Entity ID des Power-Off Buttons in Home Assistant",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = InkSoft
                 )
             }
@@ -153,10 +156,10 @@ fun SetupScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "IP und Port deines Home Assistant Servers, z. B. 192.168.0.205:8123",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = InkSoft
                 )
                 Spacer(Modifier.height(14.dp))
@@ -169,10 +172,10 @@ fun SetupScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "IP deines Relay Servers, z. B. 100.106.82.86",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = InkSoft
                 )
             }
@@ -193,10 +196,10 @@ fun SetupScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "Profile ID von OpenVPN Connect für deine Heimnetz-Verbindung",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = InkSoft
                 )
             }
