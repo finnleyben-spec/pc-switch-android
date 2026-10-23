@@ -83,11 +83,19 @@ class UpdateManager(private val ctx: Context) {
                             }
                         }
                     }
+                    android.util.Log.d("UpdateManager", "Download complete, size: ${tmp.length()}")
+                    if (!tmp.exists() || tmp.length() == 0L) {
+                        android.util.Log.e("UpdateManager", "Downloaded file is empty")
+                        return@withContext null
+                    }
+                    if (target.exists()) target.delete()
+                    if (!tmp.renameTo(target)) {
+                        android.util.Log.e("UpdateManager", "Failed to rename temp file")
+                        return@withContext null
+                    }
+                    android.util.Log.d("UpdateManager", "Renamed to: ${target.absolutePath}")
+                    target
                 }
-                android.util.Log.d("UpdateManager", "Download complete, renaming to: $target")
-                if (target.exists()) target.delete()
-                tmp.renameTo(target)
-                target
             } catch (e: Exception) {
                 android.util.Log.e("UpdateManager", "Download failed", e)
                 tmp.delete()
