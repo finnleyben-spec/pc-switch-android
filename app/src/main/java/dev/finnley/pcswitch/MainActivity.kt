@@ -113,6 +113,12 @@ class MainActivity : Activity() {
 
         val deepLink = intent?.dataString
         if (savedInstanceState == null) {
+            // Jeder Cold Start: HTTP-Cache leeren, damit ein alter Service Worker
+            // kein veraltetes index.html (und keinen alten sw.js) mehr serviert.
+            // Ohne das blockiert ein stale SW genau den Update-Button, der das
+            // Problem eigentlich lösen soll (Henne-Ei). Der SW-Offline-Cache
+            // (CacheStorage) bleibt unangetastet → Offline weiter möglich.
+            web.clearCache(true)
             // Lokale Version in die PWA injizieren: der Update-Button in der App
             // vergleicht version_code mit version.json (GitHub Pages).
             val base = deepLink ?: DEFAULT_URL
