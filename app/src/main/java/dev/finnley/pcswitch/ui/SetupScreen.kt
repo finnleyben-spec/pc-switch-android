@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -27,12 +28,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.finnley.pcswitch.state.Settings
+import dev.finnley.pcswitch.update.UpdateManager
 
 @Composable
 fun SetupScreen(
     initial: Settings,
     busy: Boolean,
-    onSave: (String, String, String, String, String, String) -> Unit
+    updateChecking: Boolean,
+    updateAvailable: UpdateManager.UpdateInfo?,
+    onSave: (String, String, String, String, String, String) -> Unit,
+    onCheckUpdate: () -> Unit
 ) {
     var lan by remember { mutableStateOf(initial.lanBase) }
     var relay by remember { mutableStateOf(initial.relayBase) }
@@ -96,6 +101,26 @@ fun SetupScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(if (busy) "Verbinde…" else "Speichern & Verbinden", fontSize = 15.sp)
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = onCheckUpdate,
+            enabled = !updateChecking,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                if (updateChecking) "Prüfe…" else "Update prüfen",
+                fontSize = 13.sp
+            )
+        }
+        if (updateAvailable != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Update verfügbar: ${updateAvailable.versionName}\n${updateAvailable.notes}",
+                fontSize = 11.sp,
+                color = Accent
+            )
         }
     }
 }

@@ -21,13 +21,14 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                 SetupScreen(
                     initial = vm.settings,
                     busy = false,
-                    onSave = vm::saveSetup
+                    updateChecking = false,
+                    updateAvailable = state.updateAvailable,
+                    onSave = vm::saveSetup,
+                    onCheckUpdate = vm::checkForUpdate
                 )
             } else {
                 MainScreen(
                     state = state,
-                    onEntityId = vm.settings.onEntity,
-                    offEntityId = vm.settings.offEntity,
                     onConnectToHome = vm::connectToHome,
                     onDisconnect = vm::disconnectHome,
                     onPressOn = vm::pressOn,

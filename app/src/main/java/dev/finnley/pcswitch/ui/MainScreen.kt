@@ -33,8 +33,6 @@ import dev.finnley.pcswitch.state.UiState
 @Composable
 fun MainScreen(
     state: UiState,
-    onEntityId: String,
-    offEntityId: String,
     onConnectToHome: () -> Unit,
     onDisconnect: () -> Unit,
     onPressOn: () -> Unit,
@@ -113,7 +111,7 @@ fun MainScreen(
 
         // ---------- VPN CTA ----------
         when (state.mode) {
-            Mode.Offline -> VpnButton(
+            Mode.Offline, Mode.Remote -> VpnButton(
                 text = "Connect to home",
                 accent = true,
                 busy = state.vpnBusy,
@@ -148,12 +146,6 @@ fun MainScreen(
             )
         }
         Spacer(Modifier.height(18.dp))
-
-        // ---------- Entities ----------
-        EntityCard("WECKEN", onEntityId, state.onState)
-        Spacer(Modifier.height(12.dp))
-        EntityCard("AUSCHALTEN", offEntityId, state.offState)
-        Spacer(Modifier.height(22.dp))
 
         // ---------- Footer ----------
         Row(
