@@ -165,6 +165,13 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         checkForUpdate()
     }
 
+    fun saveNetworkSettings(lan: String, relay: String) {
+        settings.lanBase = lan
+        settings.relayBase = relay
+        startSessions()
+        viewModelScope.launch(Dispatchers.IO) { probeOnce() }
+    }
+
     fun openSetup() {
         _state.update { it.copy(inSetup = true) }
     }

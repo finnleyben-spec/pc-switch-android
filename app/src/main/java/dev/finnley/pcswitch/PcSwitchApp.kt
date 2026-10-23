@@ -33,6 +33,8 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                 )
             } else if (state.inSettings) {
                 SettingsScreen(
+                    lanBase = vm.settings.lanBase,
+                    relayBase = vm.settings.relayBase,
                     updateChecking = state.updateChecking,
                     updateAvailable = state.updateAvailable?.versionName,
                     updateNotes = state.updateAvailable?.notes,
@@ -40,6 +42,7 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     downloadFailed = state.downloadFailed,
                     hasPreviousVersion = vm.hasPreviousVersion(),
                     onBack = vm::closeSettings,
+                    onSaveNetwork = vm::saveNetworkSettings,
                     onCheckUpdate = vm::checkForUpdate,
                     onDownloadUpdate = vm::downloadUpdate,
                     onRetryDownload = vm::retryDownload,
