@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pfade, die die FileProvider als content://-URI freigibt.
+     Update-APK liegt in getExternalFilesDir(DIRECTORY_DOWNLOADS). -->
+<paths>
+    <external-files-path name="downloads" path="Download/" />
+    <files-path name="internal_downloads" path="Download/" />
+</paths>

@@ -34,4 +34,6 @@ android {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
+    // FileProvider für den APK-Install-Flow (Self-Update)
+    implementation("androidx.core:core-ktx:1.13.1")
 }
