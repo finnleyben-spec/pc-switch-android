@@ -61,7 +61,6 @@ fun MainScreen(
                     color = Ink,
                     letterSpacing = (-0.6).sp
                 )
-                Text("v${BuildConfig.VERSION_NAME}", fontSize = 11.sp, color = InkSoft)
             }
             state.updateAvailable?.let { up ->
                 Box(
@@ -135,24 +134,12 @@ fun MainScreen(
         }
         Spacer(Modifier.height(18.dp))
 
-        // ---------- Power ----------
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val enabled = state.mode != Mode.Offline && !state.vpnBusy
-            PowerButton(
-                label = "An",
-                active = true,
-                enabled = enabled,
-                onClick = onPressOn,
-                modifier = Modifier.weight(1f)
-            )
-            PowerButton(
-                label = "Aus",
-                active = false,
-                enabled = enabled,
-                onClick = onPressOff,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        // ---------- Power Toggle ----------
+        PowerToggle(
+            enabled = state.mode != Mode.Offline && !state.vpnBusy,
+            onToggle = { onPressOn() },
+            modifier = Modifier.fillMaxWidth()
+        )
         Spacer(Modifier.height(18.dp))
 
         // ---------- Footer ----------
@@ -161,7 +148,6 @@ fun MainScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("v${BuildConfig.VERSION_NAME}", fontSize = 11.sp, color = InkSoft)
             Box(
                 Modifier
                     .clip(RoundedCornerShape(8.dp))

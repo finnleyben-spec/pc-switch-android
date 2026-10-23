@@ -262,12 +262,15 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         emitEntityStates()
     }
 
-    /** Aktives Netzwerk läuft über einen VPN-Transport? */
+    /** Aktives Netzwerk ist ein reines VPN-Netzwerk (kein WLAN/Cellular)? */
     private fun onVpn(): Boolean = try {
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val net = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(net) ?: return false
-        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        // Nur als VPN melden wenn WLAN/Cellular NICHT verfügbar sind
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+            !caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+            !caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
     } catch (e: Exception) {
         false
     }
