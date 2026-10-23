@@ -39,6 +39,10 @@ import dev.finnley.pcswitch.BuildConfig
 fun SettingsScreen(
     lanBase: String,
     relayBase: String,
+    token: String,
+    onEntity: String,
+    offEntity: String,
+    vpnProfileId: String,
     updateChecking: Boolean,
     updateAvailable: String?,
     updateNotes: String?,
@@ -46,7 +50,7 @@ fun SettingsScreen(
     downloadFailed: Boolean,
     hasPreviousVersion: Boolean,
     onBack: () -> Unit,
-    onSaveNetwork: (String, String) -> Unit,
+    onSave: (String, String, String, String, String, String) -> Unit,
     onCheckUpdate: () -> Unit,
     onDownloadUpdate: () -> Unit,
     onRetryDownload: () -> Unit,
@@ -55,6 +59,10 @@ fun SettingsScreen(
     var showChangelog by remember { mutableStateOf(false) }
     var editedLan by remember { mutableStateOf(lanBase) }
     var editedRelay by remember { mutableStateOf(relayBase) }
+    var editedToken by remember { mutableStateOf(token) }
+    var editedOnEntity by remember { mutableStateOf(onEntity) }
+    var editedOffEntity by remember { mutableStateOf(offEntity) }
+    var editedVpnId by remember { mutableStateOf(vpnProfileId) }
 
     if (showChangelog) {
         AlertDialog(
@@ -121,7 +129,7 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "App-Informationen und Updates",
+            "App-Informationen, Netzwerk und Updates",
             fontSize = 13.sp,
             color = InkSoft
         )
@@ -142,6 +150,44 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(20.dp))
 
+        // Home Assistant Settings Card
+        GlassCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                UppercaseLabel("Home Assistant")
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = editedToken,
+                    onValueChange = { editedToken = it },
+                    label = { Text("HA Token") },
+                    placeholder = { Text("Long-Lived Access Token") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = editedOnEntity,
+                    onValueChange = { editedOnEntity = it },
+                    label = { Text("On Entity ID") },
+                    placeholder = { Text("button.buro_wake_pc_buro") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = editedOffEntity,
+                    onValueChange = { editedOffEntity = it },
+                    label = { Text("Off Entity ID") },
+                    placeholder = { Text("input_button.pc_ausschalten") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
         // Network Settings Card
         GlassCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
@@ -151,7 +197,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = editedLan,
                     onValueChange = { editedLan = it },
-                    label = { Text("LAN-Base") },
+                    label = { Text("LAN Base") },
                     placeholder = { Text("z. B. 192.168.0.205:8123") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -161,21 +207,40 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = editedRelay,
                     onValueChange = { editedRelay = it },
-                    label = { Text("Relay-Base") },
+                    label = { Text("Relay Base") },
                     placeholder = { Text("z. B. 100.106.82.86") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        // VPN Settings Card
+        GlassCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                UppercaseLabel("OpenVPN")
                 Spacer(Modifier.height(12.dp))
 
-                Button(
-                    onClick = { onSaveNetwork(editedLan, editedRelay) },
-                    shape = RoundedCornerShape(12.dp),
+                OutlinedTextField(
+                    value = editedVpnId,
+                    onValueChange = { editedVpnId = it },
+                    label = { Text("OpenVPN Profile ID") },
+                    placeholder = { Text("Profil-ID aus OpenVPN Connect") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Speichern", fontSize = 14.sp)
-                }
+                )
             }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        // Save Button
+        Button(
+            onClick = { onSave(editedLan, editedRelay, editedToken, editedOnEntity, editedOffEntity, editedVpnId) },
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Speichern", fontSize = 14.sp)
         }
         Spacer(Modifier.height(20.dp))
 

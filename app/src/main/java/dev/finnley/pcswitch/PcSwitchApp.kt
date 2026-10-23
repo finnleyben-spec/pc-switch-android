@@ -5,8 +5,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
 import dev.finnley.pcswitch.state.PcSwitchViewModel
 import dev.finnley.pcswitch.ui.Accent
 import dev.finnley.pcswitch.ui.Bg
@@ -24,17 +22,17 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                 SetupScreen(
                     initial = vm.settings,
                     busy = false,
-                    updateChecking = state.updateChecking,
-                    updateAvailable = state.updateAvailable,
                     onSave = vm::saveSetup,
-                    onBack = vm::closeSetup,
-                    onCheckUpdate = vm::checkForUpdate,
-                    onDownloadUpdate = vm::downloadUpdate
+                    onBack = vm::closeSetup
                 )
             } else if (state.inSettings) {
                 SettingsScreen(
                     lanBase = vm.settings.lanBase,
                     relayBase = vm.settings.relayBase,
+                    token = vm.settings.token,
+                    onEntity = vm.settings.onEntity,
+                    offEntity = vm.settings.offEntity,
+                    vpnProfileId = vm.settings.vpnProfileId,
                     updateChecking = state.updateChecking,
                     updateAvailable = state.updateAvailable?.versionName,
                     updateNotes = state.updateAvailable?.notes,
@@ -42,7 +40,7 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     downloadFailed = state.downloadFailed,
                     hasPreviousVersion = vm.hasPreviousVersion(),
                     onBack = vm::closeSettings,
-                    onSaveNetwork = vm::saveNetworkSettings,
+                    onSave = vm::saveSetup,
                     onCheckUpdate = vm::checkForUpdate,
                     onDownloadUpdate = vm::downloadUpdate,
                     onRetryDownload = vm::retryDownload,
