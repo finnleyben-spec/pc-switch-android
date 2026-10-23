@@ -7,7 +7,6 @@ import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Bundle
-import android.os.Environment
 import android.webkit.SslErrorHandler
 import android.webkit.WebResourceRequest
 import android.webkit.JavascriptInterface
@@ -15,6 +14,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import android.util.Log
 import androidx.core.content.FileProvider
 import java.io.File
 import java.net.URL
@@ -125,14 +125,22 @@ class MainActivity : Activity() {
         Thread {
             try {
                 toast("Update wird heruntergeladen …")
-                val dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
+                // IMMER interner Speicher: getExternalFilesDir liefert auf manchen
+                // Geräten/Emulatoren einen Pfad, dessen Verzeichnis noch nicht existiert
+                // (kein mkdirs) → outputStream() wirft FileNotFoundException.
+                // filesDir existiert garantiert. FileProvider deckt files/apk/ ab.
+                val dir = File(filesDir, "apk")
+                dir.mkdirs()
                 val apk = File(dir, "pc-switch-update.apk")
+                Log.d("PCSW", "download start: url=$url dir=$dir")
                 URL(url).openStream().use { input ->
                     apk.outputStream().use { output -> input.copyTo(output) }
                 }
+                Log.d("PCSW", "download done: ${apk.length()} bytes")
                 if (apk.length() < 50_000L) throw RuntimeException("Datei zu klein: ${apk.length()} B")
                 runOnUiThread { installApk(apk) }
             } catch (e: Exception) {
+                Log.e("PCSW", "update failed", e)
                 runOnUiThread { toast("Update-Fehler: ${e.message}") }
             }
         }.start()
@@ -141,12 +149,14 @@ class MainActivity : Activity() {
     private fun installApk(apk: File) {
         try {
             val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
+            Log.d("PCSW", "installApk: uri=$uri apk=$apk")
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             startActivity(intent)
         } catch (e: Exception) {
+            Log.e("PCSW", "installApk failed", e)
             toast("Kein Installer verfügbar: ${e.message}")
         }
     }
