@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Bundle
+import android.os.Looper
 import android.webkit.SslErrorHandler
 import android.webkit.WebResourceRequest
 import android.webkit.JavascriptInterface
@@ -162,7 +163,14 @@ class MainActivity : Activity() {
     }
 
     private fun toast(msg: String) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        // Toast.makeText/zeigen braucht einen Looper → auf UI-Thread ausführen,
+        // egal von welchem Thread hier aufgerufen (sonst NPE "Can't toast on a
+        // thread that has not called Looper.prepare()").
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        } else {
+            runOnUiThread { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
+        }
     }
 
     override fun onBackPressed() {
