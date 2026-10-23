@@ -24,12 +24,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Dark Cyber Gothic Design-Tokens
+// Dark Cyber Gothic Design-Tokens (improved contrast for readability)
 val Bg = Color(0xFF0A0A0F)
 val Surface = Color(0xFF14141C)
 val SurfaceAlt = Color(0xFF1A1A24)
-val Ink = Color(0xFFE8E8F0)
-val InkSoft = Color(0xFF8888A0)
+val Ink = Color(0xFFF0F0F8)
+val InkSoft = Color(0xFFB0B0C8)
 val Line = Color(0xFF2A2A38)
 val Accent = Color(0xFF7C4DFF)
 val AccentSoft = Color(0xFF9B7CFF)
@@ -52,7 +52,7 @@ fun GlassCard(
                 shape = RoundedCornerShape(20.dp)
             )
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0x0DFFFFFF))
+            .background(Color(0x08FFFFFF))
             .border(1.dp, Color(0x14FFFFFF), RoundedCornerShape(20.dp)),
         content = content
     )
