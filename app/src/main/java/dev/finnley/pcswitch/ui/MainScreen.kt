@@ -90,7 +90,7 @@ fun MainScreen(
         Spacer(Modifier.height(22.dp))
 
         // ---------- Status Card (Glassmorphism) ----------
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 val dot = when (state.mode) {
                     Mode.HomeLan, Mode.HomeVpn -> Ok

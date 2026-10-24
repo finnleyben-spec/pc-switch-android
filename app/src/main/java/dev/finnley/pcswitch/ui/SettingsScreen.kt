@@ -61,6 +61,7 @@ fun SettingsScreen(
     var editedLan by remember { mutableStateOf(lanBase) }
     var editedRelay by remember { mutableStateOf(relayBase) }
     var editedToken by remember { mutableStateOf(token) }
+    var visibleToken by remember { mutableStateOf(false) }
     var editedOnEntity by remember { mutableStateOf(onEntity) }
     var editedOffEntity by remember { mutableStateOf(offEntity) }
     var editedVpnId by remember { mutableStateOf(vpnProfileId) }
@@ -139,9 +140,9 @@ fun SettingsScreen(
         Spacer(Modifier.height(24.dp))
 
         // Version Info Card
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                UppercaseLabel("Version")
+                GothicLabel("Version")
                 Spacer(Modifier.height(10.dp))
                 Text(
                     "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
@@ -154,22 +155,25 @@ fun SettingsScreen(
         Spacer(Modifier.height(20.dp))
 
         // Home Assistant Settings Card
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                UppercaseLabel("Home Assistant")
+                GothicLabel("Home Assistant")
                 Spacer(Modifier.height(12.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = editedToken,
                     onValueChange = { editedToken = it },
                     label = { Text("HA Token") },
                     placeholder = { Text("Long-Lived Access Token") },
                     singleLine = true,
+                    password = true,
+                    visible = visibleToken,
+                    onVisibleChange = { visibleToken = it },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = editedOnEntity,
                     onValueChange = { editedOnEntity = it },
                     label = { Text("On Entity ID") },
@@ -179,7 +183,7 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(10.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = editedOffEntity,
                     onValueChange = { editedOffEntity = it },
                     label = { Text("Off Entity ID") },
@@ -192,12 +196,12 @@ fun SettingsScreen(
         Spacer(Modifier.height(20.dp))
 
         // Network Settings Card
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                UppercaseLabel("Netzwerk")
+                GothicLabel("Netzwerk")
                 Spacer(Modifier.height(12.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = editedLan,
                     onValueChange = { editedLan = it },
                     label = { Text("LAN Base") },
@@ -207,7 +211,7 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(10.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = editedRelay,
                     onValueChange = { editedRelay = it },
                     label = { Text("Relay Base") },
@@ -220,12 +224,12 @@ fun SettingsScreen(
         Spacer(Modifier.height(20.dp))
 
         // VPN Settings Card
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                UppercaseLabel("OpenVPN")
+                GothicLabel("OpenVPN")
                 Spacer(Modifier.height(12.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = editedVpnId,
                     onValueChange = { editedVpnId = it },
                     label = { Text("OpenVPN Profile ID") },
@@ -248,9 +252,9 @@ fun SettingsScreen(
         Spacer(Modifier.height(20.dp))
 
         // Update Section
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                UppercaseLabel("Update")
+                GothicLabel("Update")
                 Spacer(Modifier.height(12.dp))
 
                 // Manual check button
@@ -312,9 +316,9 @@ fun SettingsScreen(
 
         // Rollback Section
         if (hasPreviousVersion) {
-            GlassCard(Modifier.fillMaxWidth()) {
+            GothicCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp)) {
-                    UppercaseLabel("Rollback")
+                    GothicLabel("Rollback")
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = onRollback,

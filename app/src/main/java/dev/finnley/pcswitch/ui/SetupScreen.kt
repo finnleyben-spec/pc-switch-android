@@ -87,12 +87,12 @@ fun SetupScreen(
         Spacer(Modifier.height(24.dp))
 
         // Home Assistant Settings Card
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                UppercaseLabel("Home Assistant")
+                GothicLabel("Home Assistant")
                 Spacer(Modifier.height(12.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = token,
                     onValueChange = { token = it },
                     label = { Text("HA Token") },
@@ -108,7 +108,7 @@ fun SetupScreen(
                 )
                 Spacer(Modifier.height(14.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = onEntity,
                     onValueChange = { onEntity = it },
                     label = { Text("On Entity ID") },
@@ -124,7 +124,7 @@ fun SetupScreen(
                 )
                 Spacer(Modifier.height(14.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = offEntity,
                     onValueChange = { offEntity = it },
                     label = { Text("Off Entity ID") },
@@ -143,12 +143,12 @@ fun SetupScreen(
         Spacer(Modifier.height(20.dp))
 
         // Network Settings Card
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                UppercaseLabel("Netzwerk")
+                GothicLabel("Netzwerk")
                 Spacer(Modifier.height(12.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = lan,
                     onValueChange = { lan = it },
                     label = { Text("LAN Base") },
@@ -164,7 +164,7 @@ fun SetupScreen(
                 )
                 Spacer(Modifier.height(14.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = relay,
                     onValueChange = { relay = it },
                     label = { Text("Relay Base") },
@@ -183,12 +183,12 @@ fun SetupScreen(
         Spacer(Modifier.height(20.dp))
 
         // VPN Settings Card
-        GlassCard(Modifier.fillMaxWidth()) {
+        GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
-                UppercaseLabel("OpenVPN")
+                GothicLabel("OpenVPN")
                 Spacer(Modifier.height(12.dp))
 
-                OutlinedTextField(
+                GothicOutlinedTextField(
                     value = vpnId,
                     onValueChange = { vpnId = it },
                     label = { Text("OpenVPN Profile ID") },

@@ -45,6 +45,8 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    // Icons für die UI (Visibility, VisibilityOff)
+    implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
     // HA-WebSocket + Update-Download
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
