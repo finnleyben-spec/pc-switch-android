@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed class Mode {
     data object HomeLan : Mode()
@@ -102,7 +103,9 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         vpnJob = viewModelScope.launch(Dispatchers.IO) {
             val err = VpnController.connectToHome(ctx, settings.vpnProfileId)
             if (err != null) {
-                Toast.makeText(ctx, err, Toast.LENGTH_LONG).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(ctx, err, Toast.LENGTH_LONG).show()
+                }
                 _state.update {
                     it.copy(
                         vpnBusy = false,

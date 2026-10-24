@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -192,6 +193,7 @@ fun MainScreen(
                 Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .clickable(onClick = onSettings)
             ) {
                 Text("Einstellungen", fontSize = 12.sp, color = InkSoft)
             }
