@@ -141,16 +141,21 @@ object HaClient {
             scope.cancel()
         }
 
-        /** call_service: button.press / input_button.press (Domain aus Entity ableiten). */
+        /** call_service: button.press, light.turn_on/off, switch.turn_on/off (Domain aus Entity ableiten). */
         fun press(entity: String): Boolean {
             val w = ws ?: return false
             if (!authed) return false
             val domain = entity.substringBefore('.', "")
+            val service = when (domain) {
+                "button", "input_button" -> "press"
+                "light", "switch", "fan", "cover", "lock", "vacuum" -> "toggle"
+                else -> "press"
+            }
             val o = JSONObject()
                 .put("id", ++reqId)
                 .put("type", "call_service")
                 .put("domain", domain)
-                .put("service", "press")
+                .put("service", service)
                 .put("entity_id", entity)
             return w.send(o.toString())
         }
