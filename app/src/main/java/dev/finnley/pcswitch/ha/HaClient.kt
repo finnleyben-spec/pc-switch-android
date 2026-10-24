@@ -156,7 +156,7 @@ object HaClient {
                 .put("type", "call_service")
                 .put("domain", domain)
                 .put("service", service)
-                .put("entity_id", entity)
+                .put("service_data", JSONObject().put("entity_id", entity))
             return w.send(o.toString())
         }
 
