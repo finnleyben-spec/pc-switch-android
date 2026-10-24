@@ -40,7 +40,7 @@ import dev.finnley.pcswitch.state.Settings
 fun SetupScreen(
     initial: Settings,
     busy: Boolean,
-    onSave: (String, String, String, String, String, String) -> Unit,
+    onSave: (String, String, String, String, String, String, String) -> Unit,
     onBack: () -> Unit
 ) {
     var lan by remember { mutableStateOf(initial.lanBase) }
@@ -49,6 +49,7 @@ fun SetupScreen(
     var onEntity by remember { mutableStateOf(initial.onEntity) }
     var offEntity by remember { mutableStateOf(initial.offEntity) }
     var vpnId by remember { mutableStateOf(initial.vpnProfileId) }
+    var pcIp by remember { mutableStateOf(initial.pcIp) }
 
     // Android back button goes back to main screen
     BackHandler { onBack() }
@@ -204,11 +205,35 @@ fun SetupScreen(
                 )
             }
         }
+        Spacer(Modifier.height(20.dp))
+
+        // PC Status Settings Card
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("PC Status")
+                Spacer(Modifier.height(12.dp))
+
+                GothicOutlinedTextField(
+                    value = pcIp,
+                    onValueChange = { pcIp = it },
+                    label = { Text("PC IP-Adresse") },
+                    placeholder = { Text("192.168.0.57") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "IP deines PCs für die direkte Erreichbarkeitsprüfung (TCP Port 22/80)",
+                    fontSize = 12.sp,
+                    color = InkSoft
+                )
+            }
+        }
         Spacer(Modifier.height(24.dp))
 
         // Save Button
         Button(
-            onClick = { onSave(lan, relay, token, onEntity, offEntity, vpnId) },
+            onClick = { onSave(lan, relay, token, onEntity, offEntity, vpnId, pcIp) },
             enabled = !busy,
             colors = ButtonDefaults.buttonColors(
                 containerColor = Accent,

@@ -35,6 +35,11 @@ class Settings(context: Context) {
         get() = p.getBoolean(K_DONE, false)
         set(v) { p.edit().putBoolean(K_DONE, v).apply() }
 
+    /** Direct PC IP address for TCP status check (independent of HA). */
+    var pcIp: String
+        get() = p.getString(K_PC_IP, DEF_PC_IP) ?: DEF_PC_IP
+        set(v) { p.edit().putString(K_PC_IP, v.trim()).apply() }
+
     fun entitySet(): Set<String> = setOf(onEntity, offEntity).filter { it.isNotBlank() }.toSet()
 
     companion object {
@@ -46,9 +51,11 @@ class Settings(context: Context) {
         private const val K_OFF = "off_entity"
         private const val K_VPN = "vpn_profile_id"
         private const val K_DONE = "setup_done"
+        private const val K_PC_IP = "pc_ip"
         const val DEF_LAN = "192.168.0.205:8123"
         const val DEF_RELAY = "100.106.82.86"
         const val DEF_ON = "button.buro_wake_pc_buro"
         const val DEF_OFF = "input_button.pc_ausschalten"
+        const val DEF_PC_IP = "192.168.0.57"
     }
 }

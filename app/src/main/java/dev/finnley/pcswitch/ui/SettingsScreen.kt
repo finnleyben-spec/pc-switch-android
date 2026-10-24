@@ -43,6 +43,7 @@ fun SettingsScreen(
     onEntity: String,
     offEntity: String,
     vpnProfileId: String,
+    pcIp: String,
     updateChecking: Boolean,
     updateAvailable: String?,
     updateNotes: String?,
@@ -50,7 +51,8 @@ fun SettingsScreen(
     downloadFailed: Boolean,
     hasPreviousVersion: Boolean,
     onBack: () -> Unit,
-    onSave: (String, String, String, String, String, String) -> Unit,
+    onSave: (String, String, String, String, String, String, String) -> Unit,
+    onPcIpSave: (String) -> Unit,
     onCheckUpdate: () -> Unit,
     onDownloadUpdate: () -> Unit,
     onRetryDownload: () -> Unit,
@@ -64,6 +66,7 @@ fun SettingsScreen(
     var editedOnEntity by remember { mutableStateOf(onEntity) }
     var editedOffEntity by remember { mutableStateOf(offEntity) }
     var editedVpnId by remember { mutableStateOf(vpnProfileId) }
+    var editedPcIp by remember { mutableStateOf(pcIp) }
 
     if (showChangelog) {
         AlertDialog(
@@ -240,9 +243,32 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(20.dp))
 
+        // PC Status Section
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("PC Status")
+                Spacer(Modifier.height(12.dp))
+                GothicOutlinedTextField(
+                    value = editedPcIp,
+                    onValueChange = { editedPcIp = it },
+                    label = { Text("PC IP-Adresse") },
+                    placeholder = { Text("192.168.0.57") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Direkte Erreichbarkeitsprüfung (TCP Port 22/80), unabhängig von Home Assistant.",
+                    fontSize = 12.sp,
+                    color = InkSoft
+                )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
         // Save Button
         Button(
-            onClick = { onSave(editedLan, editedRelay, editedToken, editedOnEntity, editedOffEntity, editedVpnId) },
+            onClick = { onSave(editedLan, editedRelay, editedToken, editedOnEntity, editedOffEntity, editedVpnId, editedPcIp) },
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {

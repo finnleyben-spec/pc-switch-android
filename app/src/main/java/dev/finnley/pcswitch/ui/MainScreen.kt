@@ -125,13 +125,20 @@ fun MainScreen(
                     Spacer(Modifier.width(10.dp))
                     Text(label, fontSize = 16.sp, color = Ink, fontWeight = FontWeight.Medium)
                 }
-                if (currentSwitch != null && currentSwitchState != "unknown") {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "${currentSwitch.name}: ${switchStateLabel(currentSwitchState)}",
-                        fontSize = 13.sp,
-                        color = InkSoft
-                    )
+                if (currentSwitch != null) {
+                    val isPcSwitch = currentSwitch.name.lowercase().contains("pc")
+                    val displayState = if (isPcSwitch && state.pcStatus != "unknown") state.pcStatus else currentSwitchState
+                    if (displayState != "unknown") {
+                        Spacer(Modifier.height(6.dp))
+                        val label = if (displayState == "reachable") "An"
+                            else if (displayState == "unreachable") "Aus"
+                            else switchStateLabel(displayState)
+                        Text(
+                            "${currentSwitch.name}: $label",
+                            fontSize = 13.sp,
+                            color = InkSoft
+                        )
+                    }
                 }
                 if (state.statusNote.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
@@ -159,6 +166,34 @@ fun MainScreen(
         }
         Spacer(Modifier.height(18.dp))
 
+        // PC Status card (direct network check, independent of HA)
+        val pcReachable = state.pcStatus == "reachable"
+        val pcUnknown = state.pcStatus == "unknown"
+        GothicCard(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "PC Status",
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 14.sp,
+                    color = InkSoft
+                )
+                Text(
+                    if (pcReachable) "An" else if (pcUnknown) "—" else "Aus",
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (pcReachable) Ok else if (pcUnknown) InkSoft else Err
+                )
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+
         // ---------- Switch Carousel ----------
         Box(Modifier.weight(1f)) {
             if (currentSwitch != null) {
@@ -171,7 +206,8 @@ fun MainScreen(
                     onToggleOff = onPressCurrentOff,
                     onNext = onNextSwitch,
                     onPrev = onPrevSwitch,
-                    state = currentSwitchState
+                    state = currentSwitchState,
+                    pcStatus = state.pcStatus
                 )
             } else {
                 // No switches configured yet
@@ -239,7 +275,8 @@ private fun SwitchCarousel(
     onToggleOff: () -> Unit,
     onNext: () -> Unit,
     onPrev: () -> Unit,
-    state: String = "unknown"
+    state: String = "unknown",
+    pcStatus: String = "unknown"
 ) {
     val density = LocalDensity.current
     var dragOffset by remember { mutableStateOf(0f) }
@@ -287,11 +324,18 @@ private fun SwitchCarousel(
                 )
 
                 // Status text
-                if (state != "unknown") {
+                val isPcSwitch = switch.name.lowercase().contains("pc")
+                val displayState = if (isPcSwitch && pcStatus != "unknown") pcStatus else state
+                if (displayState != "unknown") {
+                    val label = if (displayState == "reachable") "An"
+                        else if (displayState == "unreachable") "Aus"
+                        else switchStateLabel(displayState)
                     Text(
-                        switchStateLabel(state),
+                        label,
                         fontSize = 14.sp,
-                        color = InkSoft,
+                        color = if (isPcSwitch && displayState == "reachable") Ok
+                                else if (isPcSwitch && displayState == "unreachable") Err
+                                else InkSoft,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }

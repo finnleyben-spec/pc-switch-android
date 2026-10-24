@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import dev.finnley.pcswitch.BuildConfig
 import dev.finnley.pcswitch.ha.HaClient
 import dev.finnley.pcswitch.ha.HaClient.HaSession
+import dev.finnley.pcswitch.pcstatus.PcStatusChecker
 import dev.finnley.pcswitch.state.SwitchManager
 import dev.finnley.pcswitch.state.SwitchConfig
 import dev.finnley.pcswitch.update.UpdateManager
@@ -49,6 +50,7 @@ data class UiState(
     val downloadProgress: Int? = null,
     val downloadFailed: Boolean = false,
     val statusNote: String = "",
+    val pcStatus: String = "unknown",  // "reachable" | "unreachable" | "unknown"
 )
 
 class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
@@ -66,6 +68,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     private var lanSession: HaSession? = null
     private var relaySession: HaSession? = null
     private var probeJob: Job? = null
+    private var pcStatusJob: Job? = null
     private var vpnJob: Job? = null
     private var updateJob: Job? = null
     private var sessionJobs = listOf<Job>()
@@ -79,6 +82,13 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             while (true) {
                 probeOnce()
                 delay(20_000)
+            }
+        }
+        // Periodic PC status check (direct TCP, independent of HA)
+        pcStatusJob = viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                checkPcStatus()
+                delay(30_000)
             }
         }
         // Load switches and observe changes
@@ -258,7 +268,8 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         token: String,
         on: String,
         off: String,
-        vpnId: String
+        vpnId: String,
+        pcIp: String = ""
     ) {
         settings.lanBase = lan
         settings.relayBase = relay
@@ -266,10 +277,14 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         settings.onEntity = on
         settings.offEntity = off
         settings.vpnProfileId = vpnId
+        if (pcIp.isNotBlank()) {
+            settings.pcIp = pcIp
+        }
         settings.setupDone = true
         _state.update { it.copy(inSetup = token.isBlank()) }
         startSessions()
         viewModelScope.launch(Dispatchers.IO) { probeOnce() }
+        viewModelScope.launch(Dispatchers.IO) { checkPcStatus() }
         checkForUpdate()
     }
 
@@ -278,6 +293,24 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         settings.relayBase = relay
         startSessions()
         viewModelScope.launch(Dispatchers.IO) { probeOnce() }
+    }
+
+    fun savePcIp(ip: String) {
+        settings.pcIp = ip
+        viewModelScope.launch(Dispatchers.IO) { checkPcStatus() }
+    }
+
+    /** Direct TCP check for PC reachability (port 22 or 80). Independent of HA. */
+    private fun checkPcStatus() {
+        try {
+            val ip = settings.pcIp
+            val reachable = PcStatusChecker.isReachable(ip)
+            _state.update {
+                it.copy(pcStatus = if (reachable) "reachable" else "unreachable")
+            }
+        } catch (e: Exception) {
+            _state.update { it.copy(pcStatus = "unknown") }
+        }
     }
 
     fun openSetup() {
