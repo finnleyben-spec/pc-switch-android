@@ -125,9 +125,9 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(vpnBusy = true, statusNote = "Trenne Heimnetz…") }
         vpnJob = viewModelScope.launch(Dispatchers.IO) {
             VpnController.disconnectHome(ctx)
-            delay(3000)
+            // Immediately re-probe to detect VPN disconnection
             _state.update { it.copy(vpnBusy = false, statusNote = "") }
-            probeOnce() // Mode sofort neu bestimmen
+            probeOnce()
         }
     }
 
