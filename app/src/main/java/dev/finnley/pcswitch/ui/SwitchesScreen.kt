@@ -237,6 +237,7 @@ private fun SwitchDialog(
     var type by remember { mutableStateOf(switchConfig.type) }
     var primaryEntity by remember { mutableStateOf(switchConfig.primaryEntity) }
     var secondaryEntity by remember { mutableStateOf(switchConfig.secondaryEntity) }
+    var stateEntity by remember { mutableStateOf(switchConfig.stateEntity) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -310,7 +311,17 @@ private fun SwitchDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(Modifier.height(10.dp))
                 }
+
+                GothicOutlinedTextField(
+                    value = stateEntity,
+                    onValueChange = { stateEntity = it },
+                    label = { Text("State Entity (optional)") },
+                    placeholder = { Text("switch.buro_pc") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = {
@@ -321,7 +332,8 @@ private fun SwitchDialog(
                             name = name,
                             type = type,
                             primaryEntity = primaryEntity,
-                            secondaryEntity = secondaryEntity
+                            secondaryEntity = secondaryEntity,
+                            stateEntity = stateEntity
                         )
                     )
                 },

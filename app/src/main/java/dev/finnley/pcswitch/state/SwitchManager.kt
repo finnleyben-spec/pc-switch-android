@@ -79,7 +79,8 @@ class SwitchManager(private val context: Context) {
                     name = obj.getString("name"),
                     type = obj.optString("type", "dual"),
                     primaryEntity = obj.getString("primaryEntity"),
-                    secondaryEntity = obj.optString("secondaryEntity", "")
+                    secondaryEntity = obj.optString("secondaryEntity", ""),
+                    stateEntity = obj.optString("stateEntity", "")
                 ))
             }
             result
@@ -97,6 +98,7 @@ class SwitchManager(private val context: Context) {
             obj.put("type", sw.type)
             obj.put("primaryEntity", sw.primaryEntity)
             obj.put("secondaryEntity", sw.secondaryEntity)
+            obj.put("stateEntity", sw.stateEntity)
             arr.put(obj)
         }
         return arr.toString()

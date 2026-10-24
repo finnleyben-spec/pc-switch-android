@@ -39,6 +39,8 @@ data class UiState(
     val vpnBusy: Boolean = false,
     val switches: List<SwitchConfig> = emptyList(),
     val currentSwitchIndex: Int = 0,
+    val switchStates: Map<String, String> = emptyMap(),
+    val lastAction: Map<String, String> = emptyMap(),
     val onState: String = "unknown",
     val offState: String = "unknown",
     val lastUpdate: Long = 0,
@@ -159,6 +161,12 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         if (switches.isEmpty()) return
         val switch = switches[_state.value.currentSwitchIndex]
         press(switch.primaryEntity)
+        _state.update {
+            it.copy(
+                lastAction = it.lastAction + (switch.id to "on"),
+                switchStates = it.switchStates + (switch.id to "on")
+            )
+        }
     }
 
     /** Press the secondary (off) button of the current switch. */
@@ -170,6 +178,12 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             press(switch.secondaryEntity)
         } else {
             press(switch.primaryEntity)  // toggle behavior
+        }
+        _state.update {
+            it.copy(
+                lastAction = it.lastAction + (switch.id to "off"),
+                switchStates = it.switchStates + (switch.id to "off")
+            )
         }
     }
 
@@ -357,11 +371,21 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         lanSession = null
         relaySession = null
         _state.update {
-            it.copy(onState = "unknown", offState = "unknown", lastUpdate = 0)
+            it.copy(
+                onState = "unknown",
+                offState = "unknown",
+                lastUpdate = 0,
+                switchStates = emptyMap()
+            )
         }
         val token = settings.token
         if (token.isNotBlank()) {
-            val entities = settings.entitySet()
+            val switches = _state.value.switches
+            val entities = mutableSetOf<String>()
+            entities.addAll(settings.entitySet())
+            for (sw in switches) {
+                if (sw.stateEntity.isNotBlank()) entities.add(sw.stateEntity)
+            }
             lanSession = HaSession(lanBase, false, token, entities).also { it.start() }
             relaySession = HaSession(relayBase, true, token, entities).also { it.start() }
         }
@@ -378,8 +402,18 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     private fun emitEntityStates() {
         val s = activeSession() ?: return
         val m = s.entityStates.value
+        val switches = _state.value.switches
+        val switchStates = mutableMapOf<String, String>()
+        for (sw in switches) {
+            val state = when {
+                sw.stateEntity.isNotBlank() -> m[sw.stateEntity] ?: "unknown"
+                else -> _state.value.lastAction[sw.id] ?: "unknown"
+            }
+            switchStates[sw.id] = state
+        }
         _state.update {
             it.copy(
+                switchStates = switchStates,
                 onState = m[settings.onEntity] ?: "unknown",
                 offState = m[settings.offEntity] ?: "unknown",
                 lastUpdate = s.lastUpdate.value

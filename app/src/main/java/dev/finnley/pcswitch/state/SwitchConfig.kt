@@ -12,7 +12,8 @@ data class SwitchConfig(
     var name: String,
     var type: String, // "toggle" or "dual"
     var primaryEntity: String,  // on/toggle entity
-    var secondaryEntity: String = ""  // off entity (dual only)
+    var secondaryEntity: String = "",  // off entity (dual only)
+    var stateEntity: String = ""  // optional entity that reflects on/off state
 ) {
     companion object {
         fun newSwitch(id: String, name: String, type: String, primaryEntity: String, secondaryEntity: String = ""): SwitchConfig {

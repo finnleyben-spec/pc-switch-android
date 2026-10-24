@@ -60,12 +60,12 @@ fun MainScreen(
     val switches = state.switches
     val currentIndex = state.currentSwitchIndex
     val currentSwitch = if (switches.isNotEmpty()) switches[currentIndex] else null
+    val currentSwitchState = currentSwitch?.let { state.switchStates[it.id] } ?: "unknown"
 
     Column(
         Modifier
             .fillMaxSize()
             .background(Bg)
-            .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
         // ---------- Header ----------
@@ -125,6 +125,14 @@ fun MainScreen(
                     Spacer(Modifier.width(10.dp))
                     Text(label, fontSize = 16.sp, color = Ink, fontWeight = FontWeight.Medium)
                 }
+                if (currentSwitch != null && currentSwitchState != "unknown") {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "${currentSwitch.name}: ${switchStateLabel(currentSwitchState)}",
+                        fontSize = 13.sp,
+                        color = InkSoft
+                    )
+                }
                 if (state.statusNote.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     Text(state.statusNote, fontSize = 13.sp, color = InkSoft)
@@ -152,33 +160,36 @@ fun MainScreen(
         Spacer(Modifier.height(18.dp))
 
         // ---------- Switch Carousel ----------
-        if (currentSwitch != null) {
-            SwitchCarousel(
-                switch = currentSwitch,
-                totalSwitches = switches.size,
-                currentIndex = currentIndex,
-                enabled = state.mode != Mode.Offline && !state.vpnBusy,
-                onToggleOn = onPressCurrentOn,
-                onToggleOff = onPressCurrentOff,
-                onNext = onNextSwitch,
-                onPrev = onPrevSwitch
-            )
-        } else {
-            // No switches configured yet
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Surface)
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "Keine Switches konfiguriert.\nÖffne Einstellungen um Switches hinzuzufügen.",
-                    color = InkSoft,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Normal
+        Box(Modifier.weight(1f)) {
+            if (currentSwitch != null) {
+                SwitchCarousel(
+                    switch = currentSwitch,
+                    totalSwitches = switches.size,
+                    currentIndex = currentIndex,
+                    enabled = state.mode != Mode.Offline && !state.vpnBusy,
+                    onToggleOn = onPressCurrentOn,
+                    onToggleOff = onPressCurrentOff,
+                    onNext = onNextSwitch,
+                    onPrev = onPrevSwitch,
+                    state = currentSwitchState
                 )
+            } else {
+                // No switches configured yet
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Surface)
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Keine Switches konfiguriert.\nÖffne Einstellungen um Switches hinzuzufügen.",
+                        color = InkSoft,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
             }
         }
 
@@ -210,6 +221,14 @@ fun MainScreen(
     }
 }
 
+private fun switchStateLabel(state: String): String {
+    return when (state.lowercase()) {
+        "on", "on", "true", "1", "active", "connected" -> "An"
+        "off", "off", "false", "0", "inactive", "disconnected" -> "Aus"
+        else -> state
+    }
+}
+
 @Composable
 private fun SwitchCarousel(
     switch: SwitchConfig,
@@ -219,7 +238,8 @@ private fun SwitchCarousel(
     onToggleOn: () -> Unit,
     onToggleOff: () -> Unit,
     onNext: () -> Unit,
-    onPrev: () -> Unit
+    onPrev: () -> Unit,
+    state: String = "unknown"
 ) {
     val density = LocalDensity.current
     var dragOffset by remember { mutableStateOf(0f) }
@@ -227,7 +247,7 @@ private fun SwitchCarousel(
     // Swipe gesture detection
     Box(
         Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .pointerInput(switch.id) {
                 detectHorizontalDragGestures(
                     onHorizontalDrag = { change, dragAmount ->
@@ -252,8 +272,9 @@ private fun SwitchCarousel(
         Crossfade(targetState = switch.id, label = "switch_carousel") { id ->
             Column(
                 Modifier
-                    .fillMaxWidth()
-                    .offset(x = dragOffset.dp)
+                    .fillMaxSize()
+                    .offset(x = dragOffset.dp),
+                verticalArrangement = Arrangement.Center
             ) {
                 // Switch name
                 Text(
@@ -264,6 +285,16 @@ private fun SwitchCarousel(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
+
+                // Status text
+                if (state != "unknown") {
+                    Text(
+                        switchStateLabel(state),
+                        fontSize = 14.sp,
+                        color = InkSoft,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
 
                 // Switch indicator dots
                 if (totalSwitches > 1) {
