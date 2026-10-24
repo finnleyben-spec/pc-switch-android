@@ -302,7 +302,8 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             else -> ""
         }
         val mode = when {
-            lanReachable -> if (vpn) Mode.HomeVpn else Mode.HomeLan
+            vpn -> Mode.HomeVpn
+            lanReachable -> Mode.HomeLan
             relayReachable -> Mode.Remote
             else -> Mode.Offline
         }
@@ -312,15 +313,12 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         emitEntityStates()
     }
 
-    /** Aktives Netzwerk ist ein reines VPN-Netzwerk (kein WLAN/Cellular)? */
+    /** Aktives Netzwerk ist ein VPN (OpenVPN oder Tailscale)? */
     private fun onVpn(): Boolean = try {
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val net = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(net) ?: return false
-        // Nur als VPN melden wenn WLAN/Cellular NICHT verfügbar sind
-        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
-            !caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
-            !caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
     } catch (e: Exception) {
         false
     }

@@ -98,8 +98,8 @@ fun MainScreen(
                     Mode.Offline -> Err
                 }
                 val label = when (state.mode) {
-                    Mode.HomeLan -> "Verbunden · Heimnetz (WLAN)"
-                    Mode.HomeVpn -> "Verbunden · Heimnetz per VPN"
+                    Mode.HomeLan -> "ZU HAUSE · LAN"
+                    Mode.HomeVpn -> "VPN"
                     Mode.Remote -> "Remote · Tailscale-Relay"
                     Mode.Connecting -> "Verbinde Heimnetz…"
                     Mode.Offline -> "Offline"
@@ -125,7 +125,7 @@ fun MainScreen(
                 busy = state.vpnBusy,
                 onClick = onConnectToHome
             )
-            Mode.HomeVpn -> VpnButton(
+            Mode.HomeLan, Mode.HomeVpn -> VpnButton(
                 text = "Heimnetz trennen",
                 accent = false,
                 busy = state.vpnBusy,
