@@ -301,8 +301,11 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             lanReachable && lanSession?.authFailed?.value == true -> "Token prüfen (Einstellungen)"
             else -> ""
         }
+        // VPN that routes LAN = OpenVPN → HomeVpn
+        // VPN that doesn't route LAN = Tailscale → Remote
+        // No VPN + LAN reachable = HomeLan
         val mode = when {
-            vpn -> Mode.HomeVpn
+            vpn && lanReachable -> Mode.HomeVpn
             lanReachable -> Mode.HomeLan
             relayReachable -> Mode.Remote
             else -> Mode.Offline
@@ -313,13 +316,15 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         emitEntityStates()
     }
 
-    /** Aktives Netzwerk ist ein VPN (OpenVPN oder Tailscale)? */
-    private fun onVpn(): Boolean = try {
-        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val net = cm.activeNetwork ?: return false
-        val caps = cm.getNetworkCapabilities(net) ?: return false
-        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-    } catch (e: Exception) {
-        false
+    /** Aktives Netzwerk ist ein VPN? */
+    private fun onVpn(): Boolean {
+        return try {
+            val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val net = cm.activeNetwork ?: return false
+            val caps = cm.getNetworkCapabilities(net) ?: return false
+            return caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        } catch (e: Exception) {
+            false
+        }
     }
 }
