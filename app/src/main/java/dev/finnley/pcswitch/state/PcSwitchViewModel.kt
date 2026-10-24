@@ -88,7 +88,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         pcStatusJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
                 checkPcStatus()
-                delay(30_000)
+                delay(10_000)
             }
         }
         // Load switches and observe changes

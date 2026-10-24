@@ -230,7 +230,7 @@ object HaClient {
 
         private suspend fun watchdog() {
             while (true) {
-                delay(20_000)
+                delay(5_000)
                 if (!alive.value) return
                 getStates { applyStates(it.optJSONArray("result")) }
             }
