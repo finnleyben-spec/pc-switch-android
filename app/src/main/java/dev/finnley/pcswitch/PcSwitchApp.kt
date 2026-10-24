@@ -27,34 +27,24 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                 )
             } else if (state.inSettings) {
                 SettingsScreen(
-                    lanBase = vm.settings.lanBase,
-                    relayBase = vm.settings.relayBase,
-                    token = vm.settings.token,
-                    onEntity = vm.settings.onEntity,
-                    offEntity = vm.settings.offEntity,
-                    vpnProfileId = vm.settings.vpnProfileId,
-                    updateChecking = state.updateChecking,
-                    updateAvailable = state.updateAvailable?.versionName,
-                    updateNotes = state.updateAvailable?.notes,
-                    downloadProgress = state.downloadProgress,
-                    downloadFailed = state.downloadFailed,
-                    hasPreviousVersion = vm.hasPreviousVersion(),
+                    switches = state.switches,
                     onBack = vm::closeSettings,
-                    onSave = vm::saveSetup,
-                    onCheckUpdate = vm::checkForUpdate,
-                    onDownloadUpdate = vm::downloadUpdate,
-                    onRetryDownload = vm::retryDownload,
-                    onRollback = vm::rollback
+                    onAddSwitch = vm::addSwitch,
+                    onEditSwitch = vm::updateSwitch,
+                    onRemoveSwitch = vm::removeSwitch,
+                    onReorderSwitches = vm::reorderSwitches
                 )
             } else {
                 MainScreen(
                     state = state,
                     onConnectToHome = vm::connectToHome,
                     onDisconnect = vm::disconnectHome,
-                    onPressOn = vm::pressOn,
-                    onPressOff = vm::pressOff,
+                    onPressCurrentOn = vm::pressCurrentSwitchOn,
+                    onPressCurrentOff = vm::pressCurrentSwitchOff,
                     onSettings = vm::openSettings,
-                    onUpdate = vm::downloadUpdate
+                    onUpdate = vm::downloadUpdate,
+                    onNextSwitch = vm::nextSwitch,
+                    onPrevSwitch = vm::prevSwitch
                 )
             }
         }

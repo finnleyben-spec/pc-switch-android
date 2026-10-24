@@ -10,6 +10,8 @@ import androidx.lifecycle.viewModelScope
 import dev.finnley.pcswitch.BuildConfig
 import dev.finnley.pcswitch.ha.HaClient
 import dev.finnley.pcswitch.ha.HaClient.HaSession
+import dev.finnley.pcswitch.state.SwitchManager
+import dev.finnley.pcswitch.state.SwitchConfig
 import dev.finnley.pcswitch.update.UpdateManager
 import dev.finnley.pcswitch.vpn.VpnController
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +35,8 @@ data class UiState(
     val inSettings: Boolean = false,
     val mode: Mode = Mode.Offline,
     val vpnBusy: Boolean = false,
+    val switches: List<SwitchConfig> = emptyList(),
+    val currentSwitchIndex: Int = 0,
     val onState: String = "unknown",
     val offState: String = "unknown",
     val lastUpdate: Long = 0,
@@ -47,6 +51,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
     private val ctx: Context = app
     val settings = Settings(ctx)
+    val switchManager = SwitchManager(ctx)
     private val updater = UpdateManager(ctx)
 
     private val _state = MutableStateFlow(
@@ -70,6 +75,14 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             while (true) {
                 probeOnce()
                 delay(20_000)
+            }
+        }
+        // Load switches and observe changes
+        viewModelScope.launch {
+            switchManager.switchesFlow().collect { switches ->
+                _state.update { st ->
+                    st.copy(switches = switches)
+                }
             }
         }
         // Check for updates on startup
@@ -136,10 +149,87 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     fun pressOn() = press(settings.onEntity)
     fun pressOff() = press(settings.offEntity)
 
+    /** Press the primary (on) button of the current switch. */
+    fun pressCurrentSwitchOn() {
+        val switches = _state.value.switches
+        if (switches.isEmpty()) return
+        val switch = switches[_state.value.currentSwitchIndex]
+        press(switch.primaryEntity)
+    }
+
+    /** Press the secondary (off) button of the current switch. */
+    fun pressCurrentSwitchOff() {
+        val switches = _state.value.switches
+        if (switches.isEmpty()) return
+        val switch = switches[_state.value.currentSwitchIndex]
+        if (switch.type == "dual" && switch.secondaryEntity.isNotBlank()) {
+            press(switch.secondaryEntity)
+        } else {
+            press(switch.primaryEntity)  // toggle behavior
+        }
+    }
+
     private fun press(entity: String) {
         val s = activeSession() ?: return
         if (!s.alive.value) return
         s.press(entity)
+    }
+
+    // ---------- Switch Carousel ----------
+
+    fun nextSwitch() {
+        val st = _state.value
+        if (st.switches.isEmpty()) return
+        val next = (st.currentSwitchIndex + 1) % st.switches.size
+        _state.update { it.copy(currentSwitchIndex = next) }
+    }
+
+    fun prevSwitch() {
+        val st = _state.value
+        if (st.switches.isEmpty()) return
+        val prev = (st.currentSwitchIndex - 1 + st.switches.size) % st.switches.size
+        _state.update { it.copy(currentSwitchIndex = prev) }
+    }
+
+    fun setSwitchIndex(index: Int) {
+        _state.update { st ->
+            if (index >= 0 && index < st.switches.size) {
+                st.copy(currentSwitchIndex = index)
+            } else {
+                st
+            }
+        }
+    }
+
+    // ---------- Switch Management ----------
+
+    fun addSwitch(name: String, type: String, primaryEntity: String, secondaryEntity: String) {
+        viewModelScope.launch {
+            switchManager.addSwitch(name, type, primaryEntity, secondaryEntity)
+        }
+    }
+
+    fun updateSwitch(switchConfig: SwitchConfig) {
+        viewModelScope.launch {
+            switchManager.updateSwitch(switchConfig)
+        }
+    }
+
+    fun removeSwitch(id: String) {
+        viewModelScope.launch {
+            val st = _state.value
+            switchManager.removeSwitch(id)
+            // Adjust current index if needed
+            if (st.switches.size <= st.currentSwitchIndex) {
+                _state.update { it.copy(currentSwitchIndex = 0) }
+            }
+        }
+    }
+
+    fun reorderSwitches(fromIndex: Int, toIndex: Int) {
+        viewModelScope.launch {
+            switchManager.reorderSwitches(fromIndex, toIndex)
+        }
     }
 
     // ---------- Setup ----------
