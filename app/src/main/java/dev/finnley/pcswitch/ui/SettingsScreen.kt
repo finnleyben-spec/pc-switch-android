@@ -1,7 +1,6 @@
 package dev.finnley.pcswitch.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,17 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -35,48 +28,79 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.finnley.pcswitch.state.SwitchConfig
-
-data class SwitchDragData(val switchId: String, val index: Int)
+import dev.finnley.pcswitch.BuildConfig
 
 @Composable
 fun SettingsScreen(
-    switches: List<SwitchConfig>,
+    lanBase: String,
+    relayBase: String,
+    token: String,
+    onEntity: String,
+    offEntity: String,
+    vpnProfileId: String,
+    updateChecking: Boolean,
+    updateAvailable: String?,
+    updateNotes: String?,
+    downloadProgress: Int?,
+    downloadFailed: Boolean,
+    hasPreviousVersion: Boolean,
     onBack: () -> Unit,
-    onAddSwitch: (String, String, String, String) -> Unit,
-    onEditSwitch: (SwitchConfig) -> Unit,
-    onRemoveSwitch: (String) -> Unit,
-    onReorderSwitches: (Int, Int) -> Unit
+    onSave: (String, String, String, String, String, String) -> Unit,
+    onCheckUpdate: () -> Unit,
+    onDownloadUpdate: () -> Unit,
+    onRetryDownload: () -> Unit,
+    onRollback: () -> Unit
 ) {
-    var showAddDialog by remember { mutableStateOf(false) }
-    var editingSwitch by remember { mutableStateOf<SwitchConfig?>(null) }
+    var showChangelog by remember { mutableStateOf(false) }
+    var editedLan by remember { mutableStateOf(lanBase) }
+    var editedRelay by remember { mutableStateOf(relayBase) }
+    var editedToken by remember { mutableStateOf(token) }
+    var visibleToken by remember { mutableStateOf(false) }
+    var editedOnEntity by remember { mutableStateOf(onEntity) }
+    var editedOffEntity by remember { mutableStateOf(offEntity) }
+    var editedVpnId by remember { mutableStateOf(vpnProfileId) }
 
-    if (showAddDialog) {
-        SwitchDialog(
-            title = "Switch hinzufügen",
-            switchConfig = SwitchConfig("new", "", "dual", "", ""),
-            onDismiss = { showAddDialog = false },
-            onSave = { sw ->
-                onAddSwitch(sw.name, sw.type, sw.primaryEntity, sw.secondaryEntity)
-                showAddDialog = false
-            }
-        )
-    }
-
-    editingSwitch?.let { sw ->
-        SwitchDialog(
-            title = "Switch bearbeiten",
-            switchConfig = sw,
-            onDismiss = { editingSwitch = null },
-            onSave = { updated ->
-                onEditSwitch(updated)
-                editingSwitch = null
+    if (showChangelog) {
+        AlertDialog(
+            onDismissRequest = { showChangelog = false },
+            title = {
+                Text(
+                    "Update verfügbar: $updateAvailable",
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 18.sp,
+                    color = Ink
+                )
+            },
+            text = {
+                Text(
+                    updateNotes ?: "",
+                    fontSize = 13.sp,
+                    color = InkSoft
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showChangelog = false
+                        onDownloadUpdate()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Accent,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Jetzt updaten")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showChangelog = false }) {
+                    Text("Abbrechen")
+                }
             }
         )
     }
@@ -94,14 +118,11 @@ fun SettingsScreen(
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, tint = Ink, contentDescription = "Zurück")
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Rounded.Add, tint = Accent, contentDescription = "Hinzufügen")
-            }
         }
         Spacer(Modifier.height(12.dp))
 
         Text(
-            "Switches",
+            "Einstellungen",
             fontFamily = FontFamily.Serif,
             fontSize = 36.sp,
             color = Ink,
@@ -110,233 +131,203 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Verwalte deine Power-Switches",
+            "App-Informationen, Netzwerk und Updates",
             fontSize = 15.sp,
             color = InkSoft,
             fontWeight = FontWeight.Normal
         )
         Spacer(Modifier.height(24.dp))
 
-        // Switch list
-        if (switches.isEmpty()) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Surface)
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
+        // Version Info Card
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("Version")
+                Spacer(Modifier.height(10.dp))
                 Text(
-                    "Keine Switches. Tippe auf + um einen hinzuzufügen.",
-                    color = InkSoft,
-                    fontSize = 15.sp
-                )
-            }
-        } else {
-            switches.forEachIndexed { index, switchConfig ->
-                SwitchListItem(
-                    switchConfig = switchConfig,
-                    index = index,
-                    onEdit = { editingSwitch = switchConfig },
-                    onRemove = { onRemoveSwitch(switchConfig.id) },
-                    onDragStart = { dragData ->
-                        // Drag handling happens via modifier
-                    },
-                    onDrop = { sourceIndex, targetIndex ->
-                        if (sourceIndex != targetIndex) {
-                            onReorderSwitches(sourceIndex, targetIndex)
-                        }
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SwitchListItem(
-    switchConfig: SwitchConfig,
-    index: Int,
-    onEdit: () -> Unit,
-    onRemove: () -> Unit,
-    onDragStart: (SwitchDragData) -> Unit,
-    onDrop: (Int, Int) -> Unit
-) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Surface)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Drag handle
-            Icon(
-                Icons.Rounded.DragIndicator,
-                tint = InkSoft.copy(alpha = 0.5f),
-                contentDescription = "Ziehen",
-                modifier = Modifier.size(18.dp)
-            )
-
-            // Switch name
-            Column(Modifier.weight(1f)) {
-                Text(
-                    switchConfig.name,
+                    "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    fontSize = 17.sp,
                     color = Ink,
-                    fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    switchConfig.primaryEntity,
-                    color = InkSoft,
-                    fontSize = 12.sp,
-                    maxLines = 1
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        // Home Assistant Settings Card
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("Home Assistant")
+                Spacer(Modifier.height(12.dp))
+
+                GothicOutlinedTextField(
+                    value = editedToken,
+                    onValueChange = { editedToken = it },
+                    label = { Text("HA Token") },
+                    placeholder = { Text("Long-Lived Access Token") },
+                    singleLine = true,
+                    password = true,
+                    visible = visibleToken,
+                    onVisibleChange = { visibleToken = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+
+                GothicOutlinedTextField(
+                    value = editedOnEntity,
+                    onValueChange = { editedOnEntity = it },
+                    label = { Text("On Entity ID") },
+                    placeholder = { Text("button.buro_wake_pc_buro") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+
+                GothicOutlinedTextField(
+                    value = editedOffEntity,
+                    onValueChange = { editedOffEntity = it },
+                    label = { Text("Off Entity ID") },
+                    placeholder = { Text("input_button.pc_ausschalten") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
+        }
+        Spacer(Modifier.height(20.dp))
 
-            // Type badge
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Accent.copy(alpha = 0.2f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    if (switchConfig.type == "toggle") "Toggle" else "Dual",
-                    color = Accent,
-                    fontSize = 11.sp
+        // Network Settings Card
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("Netzwerk")
+                Spacer(Modifier.height(12.dp))
+
+                GothicOutlinedTextField(
+                    value = editedLan,
+                    onValueChange = { editedLan = it },
+                    label = { Text("LAN Base") },
+                    placeholder = { Text("z. B. 192.168.0.205:8123") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+
+                GothicOutlinedTextField(
+                    value = editedRelay,
+                    onValueChange = { editedRelay = it },
+                    label = { Text("Relay Base") },
+                    placeholder = { Text("z. B. 100.106.82.86") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
+        }
+        Spacer(Modifier.height(20.dp))
 
-            // Edit button
-            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Rounded.Edit, tint = InkSoft, contentDescription = "Bearbeiten", modifier = Modifier.size(16.dp))
+        // VPN Settings Card
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("OpenVPN")
+                Spacer(Modifier.height(12.dp))
+
+                GothicOutlinedTextField(
+                    value = editedVpnId,
+                    onValueChange = { editedVpnId = it },
+                    label = { Text("OpenVPN Profile ID") },
+                    placeholder = { Text("Profil-ID aus OpenVPN Connect") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
+        }
+        Spacer(Modifier.height(20.dp))
 
-            // Delete button
-            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Rounded.Delete, tint = Err, contentDescription = "Löschen", modifier = Modifier.size(16.dp))
+        // Save Button
+        Button(
+            onClick = { onSave(editedLan, editedRelay, editedToken, editedOnEntity, editedOffEntity, editedVpnId) },
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Speichern", fontSize = 14.sp)
+        }
+        Spacer(Modifier.height(20.dp))
+
+        // Update Section
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("Update")
+                Spacer(Modifier.height(12.dp))
+
+                // Manual check button
+                Button(
+                    onClick = onCheckUpdate,
+                    enabled = !updateChecking,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Auf Updates prüfen", fontSize = 14.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+
+                if (updateAvailable != null) {
+                    Text(
+                        "Update verfügbar: $updateAvailable",
+                        fontSize = 13.sp,
+                        color = Accent
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    if (downloadProgress != null) {
+                        Text(
+                            "Herunterladen... $downloadProgress%",
+                            fontSize = 13.sp,
+                            color = InkSoft
+                        )
+                    } else if (downloadFailed) {
+                        Text(
+                            "Download fehlgeschlagen",
+                            fontSize = 13.sp,
+                            color = Err
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onRetryDownload,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Erneut versuchen", fontSize = 13.sp)
+                        }
+                    } else {
+                        Button(
+                            onClick = { showChangelog = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Accent,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Jetzt updaten", fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        // Rollback Section
+        if (hasPreviousVersion) {
+            GothicCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp)) {
+                    GothicLabel("Rollback")
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = onRollback,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Zurück zur vorherigen Version", fontSize = 14.sp)
+                    }
+                }
             }
         }
     }
-}
-
-@Composable
-private fun SwitchDialog(
-    title: String,
-    switchConfig: SwitchConfig,
-    onDismiss: () -> Unit,
-    onSave: (SwitchConfig) -> Unit
-) {
-    var name by remember { mutableStateOf(switchConfig.name) }
-    var type by remember { mutableStateOf(switchConfig.type) }
-    var primaryEntity by remember { mutableStateOf(switchConfig.primaryEntity) }
-    var secondaryEntity by remember { mutableStateOf(switchConfig.secondaryEntity) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                title,
-                fontFamily = FontFamily.Serif,
-                fontSize = 18.sp,
-                color = Ink
-            )
-        },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                GothicOutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    placeholder = { Text("z. B. Büro PC") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(10.dp))
-
-                // Type selector
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { type = "toggle" },
-                        enabled = true,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = if (type == "toggle") {
-                            ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
-                        } else {
-                            ButtonDefaults.buttonColors(containerColor = Surface, contentColor = InkSoft)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Toggle", fontSize = 13.sp)
-                    }
-                    Button(
-                        onClick = { type = "dual" },
-                        enabled = true,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = if (type == "dual") {
-                            ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
-                        } else {
-                            ButtonDefaults.buttonColors(containerColor = Surface, contentColor = InkSoft)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Dual", fontSize = 13.sp)
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-
-                GothicOutlinedTextField(
-                    value = primaryEntity,
-                    onValueChange = { primaryEntity = it },
-                    label = { Text("Primary Entity") },
-                    placeholder = { Text("button.buro_wake_pc") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(10.dp))
-
-                if (type == "dual") {
-                    GothicOutlinedTextField(
-                        value = secondaryEntity,
-                        onValueChange = { secondaryEntity = it },
-                        label = { Text("Secondary Entity (Off)") },
-                        placeholder = { Text("input_button.pc_aus") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSave(
-                        switchConfig.copy(
-                            name = name,
-                            type = type,
-                            primaryEntity = primaryEntity,
-                            secondaryEntity = secondaryEntity
-                        )
-                    )
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Accent,
-                    contentColor = Color.White
-                )
-            ) {
-                Text("Speichern")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
 }

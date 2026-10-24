@@ -12,6 +12,7 @@ import dev.finnley.pcswitch.ui.Ink
 import dev.finnley.pcswitch.ui.MainScreen
 import dev.finnley.pcswitch.ui.SettingsScreen
 import dev.finnley.pcswitch.ui.SetupScreen
+import dev.finnley.pcswitch.ui.SwitchesScreen
 
 @Composable
 fun PcSwitchApp(vm: PcSwitchViewModel) {
@@ -25,14 +26,35 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     onSave = vm::saveSetup,
                     onBack = vm::closeSetup
                 )
-            } else if (state.inSettings) {
-                SettingsScreen(
+            } else if (state.inSwitches) {
+                SwitchesScreen(
                     switches = state.switches,
-                    onBack = vm::closeSettings,
+                    onBack = vm::closeSwitches,
                     onAddSwitch = vm::addSwitch,
                     onEditSwitch = vm::updateSwitch,
                     onRemoveSwitch = vm::removeSwitch,
                     onReorderSwitches = vm::reorderSwitches
+                )
+            } else if (state.inSettings) {
+                SettingsScreen(
+                    lanBase = vm.settings.lanBase,
+                    relayBase = vm.settings.relayBase,
+                    token = vm.settings.token,
+                    onEntity = vm.settings.onEntity,
+                    offEntity = vm.settings.offEntity,
+                    vpnProfileId = vm.settings.vpnProfileId,
+                    updateChecking = state.updateChecking,
+                    updateAvailable = state.updateAvailable?.versionName,
+                    updateNotes = state.updateAvailable?.notes,
+                    downloadProgress = state.downloadProgress,
+                    downloadFailed = state.downloadFailed,
+                    hasPreviousVersion = vm.hasPreviousVersion(),
+                    onBack = vm::closeSettings,
+                    onSave = vm::saveSetup,
+                    onCheckUpdate = vm::checkForUpdate,
+                    onDownloadUpdate = vm::downloadUpdate,
+                    onRetryDownload = vm::retryDownload,
+                    onRollback = vm::rollback
                 )
             } else {
                 MainScreen(
@@ -42,6 +64,7 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     onPressCurrentOn = vm::pressCurrentSwitchOn,
                     onPressCurrentOff = vm::pressCurrentSwitchOff,
                     onSettings = vm::openSettings,
+                    onSwitches = vm::openSwitches,
                     onUpdate = vm::downloadUpdate,
                     onNextSwitch = vm::nextSwitch,
                     onPrevSwitch = vm::prevSwitch

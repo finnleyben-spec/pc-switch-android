@@ -52,6 +52,7 @@ fun MainScreen(
     onPressCurrentOn: () -> Unit,
     onPressCurrentOff: () -> Unit,
     onSettings: () -> Unit,
+    onSwitches: () -> Unit,
     onUpdate: () -> Unit,
     onNextSwitch: () -> Unit,
     onPrevSwitch: () -> Unit
@@ -196,6 +197,14 @@ fun MainScreen(
                     .clickable(onClick = onSettings)
             ) {
                 Text("Einstellungen", fontSize = 12.sp, color = InkSoft)
+            }
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .clickable(onClick = onSwitches)
+            ) {
+                Text("Switches", fontSize = 12.sp, color = InkSoft)
             }
         }
     }

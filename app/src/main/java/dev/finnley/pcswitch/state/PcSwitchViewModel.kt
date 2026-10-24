@@ -34,6 +34,7 @@ sealed class Mode {
 data class UiState(
     val inSetup: Boolean = false,
     val inSettings: Boolean = false,
+    val inSwitches: Boolean = false,
     val mode: Mode = Mode.Offline,
     val vpnBusy: Boolean = false,
     val switches: List<SwitchConfig> = emptyList(),
@@ -279,6 +280,14 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
     fun closeSettings() {
         _state.update { it.copy(inSettings = false) }
+    }
+
+    fun openSwitches() {
+        _state.update { it.copy(inSwitches = true) }
+    }
+
+    fun closeSwitches() {
+        _state.update { it.copy(inSwitches = false) }
     }
 
     // ---------- Self-Update ----------
