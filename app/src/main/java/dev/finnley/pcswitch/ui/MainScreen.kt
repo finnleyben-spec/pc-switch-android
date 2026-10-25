@@ -72,7 +72,7 @@ fun MainScreen(
                 .weight(1f)
                 .padding(24.dp)
         ) {
-        // ---------- Header ----------
+            // ---------- Header ----------
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
@@ -129,6 +129,21 @@ fun MainScreen(
                     Spacer(Modifier.width(10.dp))
                     Text(label, fontSize = 16.sp, color = Ink, fontWeight = FontWeight.Medium)
                 }
+                if (currentSwitch != null) {
+                    val isPcSwitch = currentSwitch.name.lowercase().contains("pc")
+                    val displayState = if (isPcSwitch && state.pcStatus != "unknown") state.pcStatus else currentSwitchState
+                    if (displayState != "unknown") {
+                        Spacer(Modifier.height(6.dp))
+                        val label = if (displayState == "reachable") "An"
+                            else if (displayState == "unreachable") "Aus"
+                            else switchStateLabel(displayState)
+                        Text(
+                            "${currentSwitch.name}: $label",
+                            fontSize = 13.sp,
+                            color = InkSoft
+                        )
+                    }
+                }
                 if (state.statusNote.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     Text(state.statusNote, fontSize = 13.sp, color = InkSoft)
@@ -155,6 +170,32 @@ fun MainScreen(
         }
         Spacer(Modifier.height(18.dp))
 
+        // PC Status card (direct network check, independent of HA)
+        val pcReachable = state.pcStatus == "reachable"
+        val pcUnknown = state.pcStatus == "unknown"
+        GothicCard(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "PC Status",
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 14.sp,
+                    color = InkSoft
+                )
+                Text(
+                    if (pcReachable) "An" else if (pcUnknown) "—" else "Aus",
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (pcReachable) Ok else if (pcUnknown) InkSoft else Err
+                )
+            }
+        }
         Spacer(Modifier.height(18.dp))
 
         // ---------- Switch Carousel ----------
@@ -191,7 +232,8 @@ fun MainScreen(
                 }
             }
         }
-    }
+
+        }
 
         // ---------- Footer ----------
         Row(
@@ -292,23 +334,19 @@ private fun SwitchCarousel(
                 // Status text
                 val isPcSwitch = switch.name.lowercase().contains("pc")
                 val displayState = if (isPcSwitch && pcStatus != "unknown") pcStatus else state
-                val label = when (displayState) {
-                    "reachable" -> "An"
-                    "unreachable" -> "Aus"
-                    "unknown" -> when {
-                        switch.type == "toggle" -> "Unklar"
-                        else -> "—"
-                    }
-                    else -> switchStateLabel(displayState)
+                if (displayState != "unknown") {
+                    val label = if (displayState == "reachable") "An"
+                        else if (displayState == "unreachable") "Aus"
+                        else switchStateLabel(displayState)
+                    Text(
+                        label,
+                        fontSize = 14.sp,
+                        color = if (isPcSwitch && displayState == "reachable") Ok
+                                else if (isPcSwitch && displayState == "unreachable") Err
+                                else InkSoft,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
                 }
-                Text(
-                    label,
-                    fontSize = 14.sp,
-                    color = if (isPcSwitch && displayState == "reachable") Ok
-                            else if (isPcSwitch && displayState == "unreachable") Err
-                            else InkSoft,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
 
                 // Switch indicator dots
                 if (totalSwitches > 1) {
@@ -333,35 +371,27 @@ private fun SwitchCarousel(
                 // Toggle controls
                 if (switch.type == "toggle") {
                     // Single toggle button
-                    PowerToggle(
+                    ToggleButton(
+                        label = "Schalten",
                         enabled = enabled,
-                        onToggle = onToggleOn
+                        onClick = onToggleOn
                     )
                 } else {
-                    // Dual buttons: On / Off with PowerToggle style
+                    // Dual buttons: On / Off
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(60.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Accent)
-                                .clickable(enabled = enabled) { onToggleOn() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("AN", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(60.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Surface)
-                                .clickable(enabled = enabled) { onToggleOff() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("AUS", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink)
-                        }
+                        ToggleButton(
+                            label = "An",
+                            enabled = enabled,
+                            accent = true,
+                            onClick = onToggleOn,
+                            modifier = Modifier.weight(1f)
+                        )
+                        ToggleButton(
+                            label = "Aus",
+                            enabled = enabled,
+                            onClick = onToggleOff,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
