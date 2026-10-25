@@ -79,9 +79,14 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     init {
         startSessions()
         probeJob = viewModelScope.launch(Dispatchers.IO) {
+            probeOnce()
             while (true) {
-                probeOnce()
-                delay(20_000)
+                delay(5_000)
+                try {
+                    probeOnce()
+                } catch (e: Exception) {
+                    // probeOnce can throw if HA probe fails; don't crash the probe loop
+                }
             }
         }
         // Periodic PC status check (direct TCP, independent of HA)
