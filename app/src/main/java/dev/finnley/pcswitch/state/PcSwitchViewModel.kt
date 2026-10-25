@@ -36,6 +36,9 @@ data class UiState(
     val inSetup: Boolean = false,
     val inSettings: Boolean = false,
     val inSwitches: Boolean = false,
+    val loading: Boolean = true,
+    val authError: Boolean = false,
+    val authErrorDismissed: Boolean = false,
     val mode: Mode = Mode.Offline,
     val vpnBusy: Boolean = false,
     val switches: List<SwitchConfig> = emptyList(),
@@ -77,16 +80,24 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     private val relayBase get() = settings.relayBase
 
     init {
-        startSessions()
+        // Don't start sessions yet — wait for switches to load first
         probeJob = viewModelScope.launch(Dispatchers.IO) {
-            probeOnce()
+            var firstProbe = true
             while (true) {
-                delay(5_000)
                 try {
                     probeOnce()
+                    if (firstProbe && !_state.value.inSetup) {
+                        firstProbe = false
+                        _state.update { it.copy(loading = false) }
+                    }
                 } catch (e: Exception) {
                     // probeOnce can throw if HA probe fails; don't crash the probe loop
+                    if (firstProbe && !_state.value.inSetup) {
+                        firstProbe = false
+                        _state.update { it.copy(loading = false) }
+                    }
                 }
+                delay(5_000)
             }
         }
         // Periodic PC status check (direct TCP, independent of HA)
@@ -96,12 +107,14 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 delay(10_000)
             }
         }
-        // Load switches and observe changes
+        // Load switches and observe changes — start sessions after switches load
         viewModelScope.launch {
             switchManager.switchesFlow().collect { switches ->
                 _state.update { st ->
                     st.copy(switches = switches)
                 }
+                // Start/restart sessions whenever switches change so entity subscriptions are correct
+                startSessions()
             }
         }
         // Check for updates on startup
@@ -286,11 +299,16 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             settings.pcIp = pcIp
         }
         settings.setupDone = true
-        _state.update { it.copy(inSetup = token.isBlank()) }
+        // Clear auth error when token is updated
+        _state.update { it.copy(inSetup = token.isBlank(), authError = false, authErrorDismissed = false) }
         startSessions()
         viewModelScope.launch(Dispatchers.IO) { probeOnce() }
         viewModelScope.launch(Dispatchers.IO) { checkPcStatus() }
         checkForUpdate()
+    }
+
+    fun dismissAuthError() {
+        _state.update { it.copy(authErrorDismissed = true) }
     }
 
     fun saveNetworkSettings(lan: String, relay: String) {
@@ -474,10 +492,16 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         val lanReachable = HaClient.probe(lanBase, false)
         val relayReachable = if (lanReachable) false else HaClient.probe(relayBase, true)
         val vpn = onVpn()
+        
+        // Check for auth failure
+        val lanAuthFailed = lanSession?.authFailed?.value == true
+        val relayAuthFailed = relaySession?.authFailed?.value == true
+        
         val note = when {
             !lanReachable && !relayReachable ->
                 if (vpn) "OpenVPN aktiv – Heimnetz nicht erreichbar" else "Heimnetz nicht erreichbar"
-            lanReachable && lanSession?.authFailed?.value == true -> "Token prüfen (Einstellungen)"
+            lanReachable && lanAuthFailed -> "Token prüfen (Einstellungen)"
+            relayReachable && relayAuthFailed -> "Token prüfen (Einstellungen)"
             else -> ""
         }
         // VPN that routes LAN = OpenVPN → HomeVpn
@@ -490,7 +514,12 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             else -> Mode.Offline
         }
         _state.update {
-            it.copy(mode = mode, statusNote = note)
+            it.copy(
+                mode = mode,
+                statusNote = note,
+                authError = lanAuthFailed || relayAuthFailed,
+                authErrorDismissed = if (lanAuthFailed || relayAuthFailed) false else it.authErrorDismissed
+            )
         }
         emitEntityStates()
     }

@@ -21,13 +21,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,7 +67,8 @@ fun MainScreen(
     onSwitches: () -> Unit,
     onUpdate: () -> Unit,
     onNextSwitch: () -> Unit,
-    onPrevSwitch: () -> Unit
+    onPrevSwitch: () -> Unit,
+    onDismissAuthError: () -> Unit
 ) {
     val switches = state.switches
     val currentIndex = state.currentSwitchIndex
@@ -73,6 +80,18 @@ fun MainScreen(
             .fillMaxSize()
             .background(Bg)
     ) {
+        // Loading indicator
+        if (state.loading) {
+            LoadingBanner()
+        }
+        // Auth error banner
+        if (state.authError && !state.authErrorDismissed) {
+            AuthErrorBanner(
+                onOpenSettings = onSettings,
+                onDismiss = onDismissAuthError
+            )
+        }
+
         Column(
             Modifier
                 .weight(1f)
@@ -116,43 +135,45 @@ fun MainScreen(
         Spacer(Modifier.height(22.dp))
 
         // ---------- Status Card ----------
-        GothicCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp)) {
-                val dot = when (state.mode) {
-                    Mode.HomeLan, Mode.HomeVpn -> Ok
-                    Mode.Remote, Mode.Connecting -> Accent
-                    Mode.Offline -> Err
-                }
-                val label = when (state.mode) {
-                    Mode.HomeLan -> "ZU HAUSE · LAN"
-                    Mode.HomeVpn -> "VPN"
-                    Mode.Remote -> "Remote · Tailscale-Relay"
-                    Mode.Connecting -> "Verbinde Heimnetz…"
-                    Mode.Offline -> "Offline"
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusDot(dot)
-                    Spacer(Modifier.width(10.dp))
-                    Text(label, fontSize = 16.sp, color = Ink, fontWeight = FontWeight.Medium)
-                }
-                if (currentSwitch != null) {
-                    val isPcSwitch = currentSwitch.name.lowercase().contains("pc")
-                    val displayState = if (isPcSwitch && state.pcStatus != "unknown") state.pcStatus else currentSwitchState
-                    if (displayState != "unknown") {
-                        Spacer(Modifier.height(6.dp))
-                        val label = if (displayState == "reachable") "An"
-                            else if (displayState == "unreachable") "Aus"
-                            else switchStateLabel(displayState)
-                        Text(
-                            "${currentSwitch.name}: $label",
-                            fontSize = 13.sp,
-                            color = InkSoft
-                        )
+        if (!state.loading) {
+            GothicCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp)) {
+                    val dot = when (state.mode) {
+                        Mode.HomeLan, Mode.HomeVpn -> Ok
+                        Mode.Remote, Mode.Connecting -> Accent
+                        Mode.Offline -> Err
                     }
-                }
-                if (state.statusNote.isNotBlank()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(state.statusNote, fontSize = 13.sp, color = InkSoft)
+                    val label = when (state.mode) {
+                        Mode.HomeLan -> "ZU HAUSE · LAN"
+                        Mode.HomeVpn -> "VPN"
+                        Mode.Remote -> "Remote · Tailscale-Relay"
+                        Mode.Connecting -> "Verbinde Heimnetz…"
+                        Mode.Offline -> "Offline"
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StatusDot(dot)
+                        Spacer(Modifier.width(10.dp))
+                        Text(label, fontSize = 16.sp, color = Ink, fontWeight = FontWeight.Medium)
+                    }
+                    if (currentSwitch != null) {
+                        val isPcSwitch = currentSwitch.name.lowercase().contains("pc")
+                        val displayState = if (isPcSwitch && state.pcStatus != "unknown") state.pcStatus else currentSwitchState
+                        if (displayState != "unknown") {
+                            Spacer(Modifier.height(6.dp))
+                            val label = if (displayState == "reachable") "An"
+                                else if (displayState == "unreachable") "Aus"
+                                else switchStateLabel(displayState)
+                            Text(
+                                "${currentSwitch.name}: $label",
+                                fontSize = 13.sp,
+                                color = InkSoft
+                            )
+                        }
+                    }
+                    if (state.statusNote.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(state.statusNote, fontSize = 13.sp, color = InkSoft)
+                    }
                 }
             }
         }
@@ -451,6 +472,13 @@ private fun ToggleButton(
 @Composable
 private fun VpnButton(text: String, accent: Boolean, busy: Boolean, onClick: () -> Unit) {
     val view = LocalView.current
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.95f else 1f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f),
+        label = "vpn_button_scale"
+    )
+
     Button(
         onClick = {
             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -470,7 +498,92 @@ private fun VpnButton(text: String, accent: Boolean, busy: Boolean, onClick: () 
         },
         contentPadding = PaddingValues(vertical = 16.dp),
         modifier = Modifier.fillMaxWidth()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = { pressed = true },
+                    onTap = { pressed = false }
+                )
+            }
+            .scale(scale)
     ) {
         Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun LoadingBanner() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(Surface)
+            .padding(vertical = 12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = Accent,
+                strokeWidth = 2.dp
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "Verbinde…",
+                fontSize = 14.sp,
+                color = InkSoft,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+fun AuthErrorBanner(
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(Err.copy(alpha = 0.1f))
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Text(
+                "Token ungültig",
+                fontSize = 14.sp,
+                color = Err,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = onOpenSettings,
+                modifier = Modifier.height(32.dp),
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Err,
+                    contentColor = Color.White
+                )
+            ) {
+                Text("Einstellungen", fontSize = 12.sp)
+            }
+            Spacer(Modifier.weight(1f))
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.Close,
+                    tint = Err,
+                    contentDescription = "Schließen",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
     }
 }

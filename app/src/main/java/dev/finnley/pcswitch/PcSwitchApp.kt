@@ -109,7 +109,8 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     onSwitches = vm::openSwitches,
                     onUpdate = vm::downloadUpdate,
                     onNextSwitch = vm::nextSwitch,
-                    onPrevSwitch = vm::prevSwitch
+                    onPrevSwitch = vm::prevSwitch,
+                    onDismissAuthError = vm::dismissAuthError
                 )
             }
         }
