@@ -422,7 +422,12 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             val entities = mutableSetOf<String>()
             entities.addAll(settings.entitySet())
             for (sw in switches) {
-                if (sw.stateEntity.isNotBlank()) entities.add(sw.stateEntity)
+                if (sw.stateEntity.isNotBlank()) {
+                    entities.add(sw.stateEntity)
+                } else {
+                    // No state entity configured — use primary entity for state tracking
+                    entities.add(sw.primaryEntity)
+                }
             }
             lanSession = HaSession(lanBase, false, token, entities).also { it.start() }
             relaySession = HaSession(relayBase, true, token, entities).also { it.start() }
@@ -445,7 +450,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         for (sw in switches) {
             val state = when {
                 sw.stateEntity.isNotBlank() -> m[sw.stateEntity] ?: "unknown"
-                else -> _state.value.lastAction[sw.id] ?: "unknown"
+                else -> m[sw.primaryEntity] ?: "unknown"
             }
             switchStates[sw.id] = state
         }
