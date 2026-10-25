@@ -243,7 +243,7 @@ fun MainScreen(
         ) {
             Box(
                 Modifier
-                    .weight(1f)
+                    .weight(3f)
                     .clip(RoundedCornerShape(0.dp, 16.dp, 0.dp, 0.dp))
                     .background(Surface.copy(alpha = 0.8f))
                     .padding(horizontal = 12.dp, vertical = 14.dp)
@@ -251,9 +251,10 @@ fun MainScreen(
             ) {
                 Text("Einstellungen", fontSize = 13.sp, color = InkSoft)
             }
+            Spacer(Modifier.weight(1f))
             Box(
                 Modifier
-                    .weight(1f)
+                    .weight(3f)
                     .clip(RoundedCornerShape(16.dp, 0.dp, 0.dp, 0.dp))
                     .background(Surface.copy(alpha = 0.8f))
                     .padding(horizontal = 12.dp, vertical = 14.dp)
