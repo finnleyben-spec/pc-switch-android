@@ -245,7 +245,7 @@ fun MainScreen(
                 Modifier
                     .weight(3f)
                     .clip(RoundedCornerShape(0.dp, 16.dp, 0.dp, 0.dp))
-                    .background(Surface.copy(alpha = 0.8f))
+                    .background(Surface)
                     .padding(horizontal = 12.dp, vertical = 14.dp)
                     .clickable(onClick = onSettings)
             ) {
@@ -256,7 +256,7 @@ fun MainScreen(
                 Modifier
                     .weight(3f)
                     .clip(RoundedCornerShape(16.dp, 0.dp, 0.dp, 0.dp))
-                    .background(Surface.copy(alpha = 0.8f))
+                    .background(Surface)
                     .padding(horizontal = 12.dp, vertical = 14.dp)
                     .clickable(onClick = onSwitches)
             ) {

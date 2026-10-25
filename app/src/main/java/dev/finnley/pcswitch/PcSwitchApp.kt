@@ -1,5 +1,9 @@
 package dev.finnley.pcswitch
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -14,28 +18,31 @@ import dev.finnley.pcswitch.ui.SettingsScreen
 import dev.finnley.pcswitch.ui.SetupScreen
 import dev.finnley.pcswitch.ui.SwitchesScreen
 
+sealed class Dest {
+    data object Main : Dest()
+    data object Settings : Dest()
+    data object Switches : Dest()
+    data object Setup : Dest()
+}
+
 @Composable
 fun PcSwitchApp(vm: PcSwitchViewModel) {
     val state by vm.state.collectAsState()
     MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = Accent)) {
         Surface(color = Bg, contentColor = Ink) {
-            if (state.inSetup) {
-                SetupScreen(
-                    initial = vm.settings,
-                    busy = false,
-                    onSave = vm::saveSetup,
-                    onBack = vm::closeSetup
-                )
-            } else if (state.inSwitches) {
-                SwitchesScreen(
-                    switches = state.switches,
-                    onBack = vm::closeSwitches,
-                    onAddSwitch = vm::addSwitch,
-                    onEditSwitch = vm::updateSwitch,
-                    onRemoveSwitch = vm::removeSwitch,
-                    onReorderSwitches = vm::reorderSwitches
-                )
-            } else if (state.inSettings) {
+            val dest = when {
+                state.inSetup -> Dest.Setup
+                state.inSwitches -> Dest.Switches
+                state.inSettings -> Dest.Settings
+                else -> Dest.Main
+            }
+
+            // Settings slides in from left
+            AnimatedVisibility(
+                visible = dest == Dest.Settings,
+                enter = slideInHorizontally(initialOffsetX = { -it }),
+                exit = slideOutHorizontally(targetOffsetX = { -it })
+            ) {
                 SettingsScreen(
                     lanBase = vm.settings.lanBase,
                     relayBase = vm.settings.relayBase,
@@ -58,7 +65,40 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     onRetryDownload = vm::retryDownload,
                     onRollback = vm::rollback
                 )
-            } else {
+            }
+
+            // Switches slides in from right
+            AnimatedVisibility(
+                visible = dest == Dest.Switches,
+                enter = slideInHorizontally(initialOffsetX = { it }),
+                exit = slideOutHorizontally(targetOffsetX = { it })
+            ) {
+                SwitchesScreen(
+                    switches = state.switches,
+                    onBack = vm::closeSwitches,
+                    onAddSwitch = vm::addSwitch,
+                    onEditSwitch = vm::updateSwitch,
+                    onRemoveSwitch = vm::removeSwitch,
+                    onReorderSwitches = vm::reorderSwitches
+                )
+            }
+
+            // Setup
+            AnimatedVisibility(
+                visible = dest == Dest.Setup,
+                enter = slideInHorizontally(initialOffsetX = { it }),
+                exit = slideOutHorizontally(targetOffsetX = { it })
+            ) {
+                SetupScreen(
+                    initial = vm.settings,
+                    busy = false,
+                    onSave = vm::saveSetup,
+                    onBack = vm::closeSetup
+                )
+            }
+
+            // Main screen is always shown as background
+            if (dest == Dest.Main) {
                 MainScreen(
                     state = state,
                     onConnectToHome = vm::connectToHome,
