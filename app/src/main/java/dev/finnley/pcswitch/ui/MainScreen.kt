@@ -219,7 +219,7 @@ fun MainScreen(
                     Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Surface)
+                        .background(Surface.copy(alpha = 0.4f))
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -245,7 +245,7 @@ fun MainScreen(
                 Modifier
                     .weight(3f)
                     .clip(RoundedCornerShape(0.dp, 16.dp, 0.dp, 0.dp))
-                    .background(Surface)
+                    .background(Surface.copy(alpha = 0.4f))
                     .padding(horizontal = 12.dp, vertical = 14.dp)
                     .clickable(onClick = onSettings)
             ) {
@@ -256,7 +256,7 @@ fun MainScreen(
                 Modifier
                     .weight(3f)
                     .clip(RoundedCornerShape(16.dp, 0.dp, 0.dp, 0.dp))
-                    .background(Surface)
+                    .background(Surface.copy(alpha = 0.4f))
                     .padding(horizontal = 12.dp, vertical = 14.dp)
                     .clickable(onClick = onSwitches)
             ) {

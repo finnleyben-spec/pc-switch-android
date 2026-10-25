@@ -1,5 +1,6 @@
 package dev.finnley.pcswitch.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +68,8 @@ fun SettingsScreen(
     var editedOffEntity by remember { mutableStateOf(offEntity) }
     var editedVpnId by remember { mutableStateOf(vpnProfileId) }
     var editedPcIp by remember { mutableStateOf(pcIp) }
+
+    BackHandler { onBack() }
 
     if (showChangelog) {
         AlertDialog(

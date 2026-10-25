@@ -1,5 +1,6 @@
 package dev.finnley.pcswitch.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +57,8 @@ fun SwitchesScreen(
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var editingSwitch by remember { mutableStateOf<SwitchConfig?>(null) }
+
+    BackHandler { onBack() }
 
     if (showAddDialog) {
         SwitchDialog(
