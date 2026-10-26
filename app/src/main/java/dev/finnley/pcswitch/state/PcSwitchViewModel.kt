@@ -409,6 +409,89 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(inSwitches = false) }
     }
 
+    // ---------- Deep Link Handlers ----------
+
+    /**
+     * Handle a setup deep link. Parses the config and applies it.
+     */
+    fun handleSetupDeepLink(
+        haUrl: String?,
+        haToken: String?,
+        switches: List<dev.finnley.pcswitch.deeplink.DeepLinkHandler.SwitchConfig>?,
+        autoConnect: Boolean
+    ) {
+        // Save HA connection settings
+        if (!haUrl.isNullOrBlank()) {
+            settings.lanBase = haUrl
+        }
+        if (!haToken.isNullOrBlank()) {
+            settings.token = haToken
+        }
+
+        // Save switches if provided
+        if (!switches.isNullOrEmpty()) {
+            viewModelScope.launch {
+                val switchConfigs = switches.map { sw ->
+                    dev.finnley.pcswitch.state.SwitchConfig.newSwitch(
+                        id = "switch_${System.currentTimeMillis()}",
+                        name = sw.name,
+                        type = sw.type,
+                        primaryEntity = sw.primaryEntity,
+                        secondaryEntity = sw.secondaryEntity
+                    )
+                }
+                switchManager.saveSwitches(switchConfigs)
+            }
+        }
+
+        settings.setupDone = true
+        _state.update { it.copy(inSetup = false) }
+        startSessions()
+
+        if (autoConnect) {
+            connectToHome()
+        }
+    }
+
+    /**
+     * Handle a trigger deep link. Finds the switch by name or index and triggers it.
+     */
+    fun handleTriggerDeepLink(press: String, switchId: String?) {
+        val st = _state.value
+        if (st.switches.isEmpty()) return
+
+        // Find switch by name or index
+        val targetSwitch = when {
+            switchId == null || switchId.isBlank() -> st.switches.firstOrNull()
+            else -> {
+                // Try as index first
+                switchId.toIntOrNull()?.let { idx ->
+                    if (idx >= 0 && idx < st.switches.size) st.switches[idx] else null
+                } ?: st.switches.firstOrNull { it.name.equals(switchId, ignoreCase = true) }
+            }
+        }
+
+        if (targetSwitch == null) return
+
+        // Find the switch index to set as current
+        val idx = st.switches.indexOf(targetSwitch)
+        if (idx != st.currentSwitchIndex) {
+            _state.update { it.copy(currentSwitchIndex = idx) }
+        }
+
+        when (press.lowercase()) {
+            "on" -> pressCurrentSwitchOn()
+            "off" -> pressCurrentSwitchOff()
+            "toggle" -> {
+                if (targetSwitch.type == "dual") {
+                    pressCurrentSwitchOff()
+                } else {
+                    pressCurrentSwitchOn()
+                }
+            }
+        }
+    }
+
     // ---------- Self-Update ----------
 
     fun checkForUpdate() {

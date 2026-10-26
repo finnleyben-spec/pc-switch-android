@@ -41,6 +41,20 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" />
             </intent-filter>
+            <!-- Deep link: pcswitch://setup?cfg=BASE64&autoconnect=1 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pcswitch" android:host="setup" />
+            </intent-filter>
+            <!-- Deep link: pcswitch://trigger?press=on&switch=1 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pcswitch" android:host="trigger" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>
