@@ -49,19 +49,23 @@ class MainActivity : ComponentActivity() {
             PcSwitchApp(model)
         }
 
-        // Handle deep link on first launch
-        handleDeepLink(intent)
+        // Handle deep link on first launch (after VM is created)
+        // setContent is synchronous, so VM is created before this line
+        if (vm != null) {
+            handleDeepLink(intent, vm!!)
+        }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleDeepLink(intent)
+        if (vm != null) {
+            handleDeepLink(intent, vm!!)
+        }
     }
 
-    private fun handleDeepLink(intent: android.content.Intent) {
+    private fun handleDeepLink(intent: android.content.Intent, model: PcSwitchViewModel) {
         val result = DeepLinkHandler.handle(intent) ?: return
-        val model = vm ?: return
 
         when (result) {
             is DeepLinkHandler.Result.Setup -> {
