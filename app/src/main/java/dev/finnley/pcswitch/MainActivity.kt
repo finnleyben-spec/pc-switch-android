@@ -51,32 +51,23 @@ class MainActivity : ComponentActivity() {
             // Handle deep link after ViewModel is created
             LaunchedEffect(initialIntent) {
                 val result = DeepLinkHandler.handle(initialIntent)
-                if (result == null) {
-                    Log.i("MainActivity", "Deep link: null")
-                } else {
-                    when (result) {
-                        is DeepLinkHandler.Result.Setup -> {
-                            Log.i("MainActivity", "Deep link: Setup (onCreate)")
-                            model.handleSetupDeepLink(
-                                haUrl = result.haUrl,
-                                haToken = result.haToken,
-                                switches = result.switches,
-                                autoConnect = result.autoConnect
-                            )
-                            Toast.makeText(this@MainActivity, "Deep link: Setup applied", Toast.LENGTH_SHORT).show()
-                        }
-                        is DeepLinkHandler.Result.Trigger -> {
-                            Log.i("MainActivity", "Deep link: Trigger (onCreate)")
-                            model.handleTriggerDeepLink(
-                                press = result.press,
-                                switchId = result.switchId
-                            )
-                            Toast.makeText(this@MainActivity, "Deep link: Trigger sent", Toast.LENGTH_SHORT).show()
-                        }
-                        DeepLinkHandler.Result.Unknown -> {
-                            Log.i("MainActivity", "Deep link: Unknown")
-                        }
+                if (result == null) return@LaunchedEffect
+                when (result) {
+                    is DeepLinkHandler.Result.Setup -> {
+                        model.handleSetupDeepLink(
+                            haUrl = result.haUrl,
+                            haToken = result.haToken,
+                            switches = result.switches,
+                            autoConnect = result.autoConnect
+                        )
                     }
+                    is DeepLinkHandler.Result.Trigger -> {
+                        model.handleTriggerDeepLink(
+                            press = result.press,
+                            switchId = result.switchId
+                        )
+                    }
+                    DeepLinkHandler.Result.Unknown -> {}
                 }
             }
 
@@ -93,32 +84,23 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(intent) {
                 val result = DeepLinkHandler.handle(intent)
-                if (result == null) {
-                    Log.i("MainActivity", "Deep link: null (onNewIntent)")
-                } else {
-                    when (result) {
-                        is DeepLinkHandler.Result.Setup -> {
-                            Log.i("MainActivity", "Deep link: Setup (onNewIntent)")
-                            model.handleSetupDeepLink(
-                                haUrl = result.haUrl,
-                                haToken = result.haToken,
-                                switches = result.switches,
-                                autoConnect = result.autoConnect
-                            )
-                            Toast.makeText(this@MainActivity, "Deep link: Setup applied", Toast.LENGTH_SHORT).show()
-                        }
-                        is DeepLinkHandler.Result.Trigger -> {
-                            Log.i("MainActivity", "Deep link: Trigger (onNewIntent)")
-                            model.handleTriggerDeepLink(
-                                press = result.press,
-                                switchId = result.switchId
-                            )
-                            Toast.makeText(this@MainActivity, "Deep link: Trigger sent", Toast.LENGTH_SHORT).show()
-                        }
-                        DeepLinkHandler.Result.Unknown -> {
-                            Log.i("MainActivity", "Deep link: Unknown (onNewIntent)")
-                        }
+                if (result == null) return@LaunchedEffect
+                when (result) {
+                    is DeepLinkHandler.Result.Setup -> {
+                        model.handleSetupDeepLink(
+                            haUrl = result.haUrl,
+                            haToken = result.haToken,
+                            switches = result.switches,
+                            autoConnect = result.autoConnect
+                        )
                     }
+                    is DeepLinkHandler.Result.Trigger -> {
+                        model.handleTriggerDeepLink(
+                            press = result.press,
+                            switchId = result.switchId
+                        )
+                    }
+                    DeepLinkHandler.Result.Unknown -> {}
                 }
             }
 
