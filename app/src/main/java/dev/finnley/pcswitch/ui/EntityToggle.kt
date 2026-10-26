@@ -2,11 +2,7 @@ package dev.finnley.pcswitch.ui
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -34,6 +30,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /**
  * Physical-feel toggle with detent resistance at center.
@@ -57,13 +54,16 @@ fun EntityToggle(
     var hasSwitched by remember { mutableStateOf(false) }
 
     // Pulsing animation for transitioning state
-    val pulseTransition = rememberInfiniteTransition(label = "toggle_pulse")
-    val pulseAlpha by pulseTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(600)),
-        label = "pulse_alpha"
-    )
+    var pulse by remember { mutableStateOf(false) }
+    LaunchedEffect(transitioning) {
+        if (transitioning) {
+            while (true) {
+                delay(300)
+                pulse = !pulse
+            }
+        }
+    }
+    val pulseAlpha = if (transitioning) (if (pulse) 1f else 0.4f) else 0.5f
 
     // Sync animation with state
     LaunchedEffect(isOn) {

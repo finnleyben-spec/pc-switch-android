@@ -7,8 +7,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -41,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import dev.finnley.pcswitch.state.Mode
 import dev.finnley.pcswitch.state.SwitchConfig
 import dev.finnley.pcswitch.state.UiState
+import kotlinx.coroutines.delay
 
 @Composable
 fun MainScreen(
@@ -411,13 +411,16 @@ private fun SwitchCarousel(
                 val isTransitioning = isPcSwitch && (pcToggleState == "booting" || pcToggleState == "shutting_down")
 
                 // Pulsing animation for transitioning state
-                val pulseTransition = rememberInfiniteTransition(label = "status_pulse")
-                val pulseAlpha by pulseTransition.animateFloat(
-                    initialValue = 0.3f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(tween(600)),
-                    label = "status_pulse_alpha"
-                )
+                var pulse by remember { mutableStateOf(false) }
+                LaunchedEffect(isTransitioning) {
+                    if (isTransitioning) {
+                        while (true) {
+                            delay(300)
+                            pulse = !pulse
+                        }
+                    }
+                }
+                val pulseAlpha = if (isTransitioning) (if (pulse) 1f else 0.3f) else 1f
 
                 AnimatedContent(
                     targetState = displayState,
