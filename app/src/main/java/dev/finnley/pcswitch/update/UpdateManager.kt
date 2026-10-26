@@ -39,17 +39,38 @@ class UpdateManager(private val ctx: Context) {
                 if (!r.isSuccessful) return@withContext null
                 val body = r.body?.string() ?: return@withContext null
                 val j = JSONObject(body)
-                val apk = j.optJSONObject("apk") ?: return@withContext null
-                val code = apk.optInt("version_code", 0)
-                if (code <= currentCode) return@withContext null
+                val tagName = j.optString("tag_name", "")
+                val versionName = tagName.removePrefix("v")
+                val assets = j.optJSONArray("assets") ?: return@withContext null
+                var apkUrl = ""
+                var versionCode = 0
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    val name = asset.optString("name", "")
+                    if (name == "version.json") {
+                        // Download version.json to get version code
+                        val versionReq = Request.Builder().url(asset.optString("browser_download_url")).build()
+                        client.newCall(versionReq).execute().use { vr ->
+                            if (vr.isSuccessful) {
+                                val versionBody = vr.body?.string() ?: ""
+                                val versionJ = JSONObject(versionBody)
+                                versionCode = versionJ.optInt("versionCode", 0)
+                            }
+                        }
+                    } else if (name.endsWith(".apk")) {
+                        apkUrl = asset.optString("browser_download_url", "")
+                    }
+                }
+                if (apkUrl.isEmpty() || versionCode <= currentCode) return@withContext null
                 UpdateInfo(
-                    versionName = apk.optString("version_name", "?"),
-                    versionCode = code,
-                    url = apk.optString("url", ""),
-                    notes = apk.optString("notes", ""),
+                    versionName = versionName,
+                    versionCode = versionCode,
+                    url = apkUrl,
+                    notes = "",
                 )
             }
         } catch (e: Exception) {
+            android.util.Log.e("UpdateManager", "Check failed", e)
             null
         }
     }
@@ -140,7 +161,7 @@ class UpdateManager(private val ctx: Context) {
     }
 
     companion object {
-        const val VERSION_URL = "https://finnleyben-spec.github.io/pc-switch/version.json"
+        const val VERSION_URL = "https://api.github.com/repos/finnleyben-spec/pc-switch-android/releases/latest"
     }
 
     fun savePreviousVersion() {

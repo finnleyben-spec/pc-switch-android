@@ -1,0 +1,6 @@
+{
+  "versionCode": 51,
+  "versionName": "2.5.3",
+  "downloadUrl": "https://github.com/finnleyben-spec/pc-switch-android/releases/download/v2.5.3/pc-switch-android-v2.5.3.apk",
+  "releaseNotes": "Entity Search, Entity Type Icons, Deep Link Support, Quick Settings Tile, Notification Support, GitHub API update check"
+}
