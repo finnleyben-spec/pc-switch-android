@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
@@ -23,6 +24,7 @@ class UpdateManager(private val ctx: Context) {
         val versionName: String,
         val versionCode: Int,
         val url: String,
+        val sha256: String,
         val notes: String,
     )
 
@@ -44,17 +46,19 @@ class UpdateManager(private val ctx: Context) {
                 val assets = j.optJSONArray("assets") ?: return@withContext null
                 var apkUrl = ""
                 var versionCode = 0
+                var sha256 = ""
                 for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
                     val name = asset.optString("name", "")
                     if (name == "version.json") {
-                        // Download version.json to get version code
+                        // Download version.json to get version code and sha256
                         val versionReq = Request.Builder().url(asset.optString("browser_download_url")).build()
                         client.newCall(versionReq).execute().use { vr ->
                             if (vr.isSuccessful) {
                                 val versionBody = vr.body?.string() ?: ""
                                 val versionJ = JSONObject(versionBody)
                                 versionCode = versionJ.optInt("versionCode", 0)
+                                sha256 = versionJ.optString("sha256", "")
                             }
                         }
                     } else if (name.endsWith(".apk")) {
@@ -66,6 +70,7 @@ class UpdateManager(private val ctx: Context) {
                     versionName = versionName,
                     versionCode = versionCode,
                     url = apkUrl,
+                    sha256 = sha256,
                     notes = "",
                 )
             }
@@ -109,6 +114,20 @@ class UpdateManager(private val ctx: Context) {
                         android.util.Log.e("UpdateManager", "Downloaded file is empty")
                         return@withContext null
                     }
+
+                    // Validate SHA-256 checksum if provided
+                    if (info.sha256.isNotEmpty()) {
+                        val computedSha = computeSha256(tmp)
+                        android.util.Log.d("UpdateManager", "Expected SHA-256: ${info.sha256}")
+                        android.util.Log.d("UpdateManager", "Computed SHA-256: $computedSha")
+                        if (computedSha != info.sha256) {
+                            android.util.Log.e("UpdateManager", "SHA-256 mismatch!")
+                            tmp.delete()
+                            return@withContext null
+                        }
+                        android.util.Log.d("UpdateManager", "SHA-256 validation passed")
+                    }
+
                     if (target.exists()) target.delete()
                     if (!tmp.renameTo(target)) {
                         android.util.Log.e("UpdateManager", "Failed to rename temp file")
@@ -158,6 +177,20 @@ class UpdateManager(private val ctx: Context) {
             )
         } catch (_: Exception) {
         }
+    }
+
+    private fun computeSha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(8192)
+            var n = input.read(buf)
+            while (n >= 0) {
+                digest.update(buf, 0, n)
+                n = input.read(buf)
+            }
+        }
+        val bytes = digest.digest()
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     companion object {

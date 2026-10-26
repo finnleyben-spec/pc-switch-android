@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -242,7 +244,9 @@ fun MainScreen(
                     onNext = onNextSwitch,
                     onPrev = onPrevSwitch,
                     state = currentSwitchState,
-                    pcStatus = state.pcStatus
+                    pcStatus = state.pcStatus,
+                    pcToggleState = state.pcToggleState,
+                    pcToggleError = state.pcToggleError
                 )
             } else {
                 // No switches configured yet
@@ -320,7 +324,9 @@ private fun SwitchCarousel(
     onNext: () -> Unit,
     onPrev: () -> Unit,
     state: String = "unknown",
-    pcStatus: String = "unknown"
+    pcStatus: String = "unknown",
+    pcToggleState: String = "idle",
+    pcToggleError: String = ""
 ) {
     val density = LocalDensity.current
     var dragOffset by remember { mutableStateOf(0f) }
@@ -402,6 +408,17 @@ private fun SwitchCarousel(
                 // Status text with animated indicator
                 val isPcSwitch = switch.name.lowercase().contains("pc")
                 val displayState = if (isPcSwitch && pcStatus != "unknown") pcStatus else state
+                val isTransitioning = isPcSwitch && (pcToggleState == "booting" || pcToggleState == "shutting_down")
+
+                // Pulsing animation for transitioning state
+                val pulseTransition = rememberInfiniteTransition(label = "status_pulse")
+                val pulseAlpha by pulseTransition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(tween(600)),
+                    label = "status_pulse_alpha"
+                )
+
                 AnimatedContent(
                     targetState = displayState,
                     label = "switch_state_indicator",
@@ -409,7 +426,21 @@ private fun SwitchCarousel(
                         fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
                     }
                 ) { state ->
-                    if (state != "unknown") {
+                    if (isTransitioning) {
+                        val label = if (pcToggleState == "booting") "Hochfahren..." else "Herunterfahren..."
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            StatusDot(Accent.copy(alpha = pulseAlpha))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                label,
+                                fontSize = 14.sp,
+                                color = Accent.copy(alpha = pulseAlpha)
+                            )
+                        }
+                    } else if (state != "unknown") {
                         val label = if (state == "reachable") "An"
                             else if (state == "unreachable") "Aus"
                             else switchStateLabel(state)
@@ -436,6 +467,16 @@ private fun SwitchCarousel(
                     }
                 }
 
+                // Show transition error
+                if (pcToggleState == "idle" && pcToggleError.isNotBlank()) {
+                    Text(
+                        pcToggleError,
+                        fontSize = 12.sp,
+                        color = Err,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
                 // Switch indicator dots
                 if (totalSwitches > 1) {
                     Row(
@@ -456,10 +497,16 @@ private fun SwitchCarousel(
                     }
                 }
 
-                // Toggle slider (same for all switch types)
+                // Toggle slider (use PC status for PC switch, plug state for others)
+                val toggleState = if (switch.name.lowercase().contains("pc") && pcStatus != "unknown") {
+                    if (pcStatus == "reachable") "on" else "off"
+                } else {
+                    state
+                }
                 EntityToggle(
-                    isOn = isOnState(state),
+                    isOn = isOnState(toggleState),
                     enabled = enabled,
+                    transitioning = isTransitioning,
                     onToggle = { newState ->
                         if (newState) {
                             onToggleOn()

@@ -55,6 +55,9 @@ data class UiState(
     val downloadFailed: Boolean = false,
     val statusNote: String = "",
     val pcStatus: String = "unknown",  // "reachable" | "unreachable" | "unknown"
+    // PC toggle transition state: idle, booting, shutting_down
+    val pcToggleState: String = "idle",
+    val pcToggleError: String = "",
     // Entity search state
     val entitySearchLoading: Boolean = false,
     val entitySearchError: String? = null,
@@ -79,6 +82,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     private var relaySession: HaSession? = null
     private var probeJob: Job? = null
     private var pcStatusJob: Job? = null
+    private var pcToggleJob: Job? = null
     private var vpnJob: Job? = null
     private var updateJob: Job? = null
     private var sessionJobs = listOf<Job>()
@@ -193,44 +197,182 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     fun pressOn() = press(settings.onEntity)
     fun pressOff() = press(settings.offEntity)
 
-    /** Press the primary (on) button of the current switch. */
+    /** Press the primary (on) button of the current switch. For PC switches, checks actual status first. */
     fun pressCurrentSwitchOn() {
         val switches = _state.value.switches
         if (switches.isEmpty()) return
         val switch = switches[_state.value.currentSwitchIndex]
-        press(switch.primaryEntity)
-        _state.update {
-            it.copy(
-                lastAction = it.lastAction + (switch.id to "on"),
-                switchStates = it.switchStates + (switch.id to "on")
-            )
+        val isPcSwitch = switch.name.lowercase().contains("pc")
+
+        // If already transitioning, ignore
+        if (_state.value.pcToggleState != "idle") return
+
+        if (isPcSwitch) {
+            // Check actual PC status before booting
+            val reachable = PcStatusChecker.isReachable(settings.pcIp)
+            if (reachable) {
+                // PC already on — just toggle normally (no booting state)
+                press(switch.primaryEntity)
+                _state.update {
+                    it.copy(
+                        lastAction = it.lastAction + (switch.id to "on"),
+                        switchStates = it.switchStates + (switch.id to "on")
+                    )
+                }
+                broadcastTileState(true, switch.name)
+            } else {
+                // PC is off — start boot flow
+                bootPc(switch)
+            }
+        } else {
+            press(switch.primaryEntity)
+            _state.update {
+                it.copy(
+                    lastAction = it.lastAction + (switch.id to "on"),
+                    switchStates = it.switchStates + (switch.id to "on")
+                )
+            }
+            broadcastTileState(true, switch.name)
         }
-        broadcastTileState(true, switch.name)
     }
 
-    /** Press the secondary (off) button of the current switch. */
+    /** Press the secondary (off) button of the current switch. For PC switches, checks actual status first. */
     fun pressCurrentSwitchOff() {
         val switches = _state.value.switches
         if (switches.isEmpty()) return
         val switch = switches[_state.value.currentSwitchIndex]
-        if (switch.type == "dual" && switch.secondaryEntity.isNotBlank()) {
-            press(switch.secondaryEntity)
+        val isPcSwitch = switch.name.lowercase().contains("pc")
+
+        // If already transitioning, ignore
+        if (_state.value.pcToggleState != "idle") return
+
+        if (isPcSwitch) {
+            // Check actual PC status before shutting down
+            val reachable = PcStatusChecker.isReachable(settings.pcIp)
+            if (reachable) {
+                // PC is on — start shutdown flow
+                shutdownPc(switch)
+            } else {
+                // PC already off — just toggle normally (no shutting_down state)
+                press(switch.primaryEntity)
+                _state.update {
+                    it.copy(
+                        lastAction = it.lastAction + (switch.id to "off"),
+                        switchStates = it.switchStates + (switch.id to "off")
+                    )
+                }
+                broadcastTileState(false, switch.name)
+            }
         } else {
-            press(switch.primaryEntity)  // toggle behavior
+            if (switch.type == "dual" && switch.secondaryEntity.isNotBlank()) {
+                press(switch.secondaryEntity)
+            } else {
+                press(switch.primaryEntity)  // toggle behavior
+            }
+            _state.update {
+                it.copy(
+                    lastAction = it.lastAction + (switch.id to "off"),
+                    switchStates = it.switchStates + (switch.id to "off")
+                )
+            }
+            broadcastTileState(false, switch.name)
         }
-        _state.update {
-            it.copy(
-                lastAction = it.lastAction + (switch.id to "off"),
-                switchStates = it.switchStates + (switch.id to "off")
-            )
-        }
-        broadcastTileState(false, switch.name)
     }
 
     private fun press(entity: String) {
         val s = activeSession() ?: return
         if (!s.alive.value) return
         s.press(entity)
+    }
+
+    /** Boot PC flow: send WoL, wait for reachable, or timeout at 60s. */
+    private fun bootPc(switch: SwitchConfig) {
+        // Send WoL packet via HA entity
+        press(switch.primaryEntity)
+        _state.update {
+            it.copy(
+                pcToggleState = "booting",
+                pcToggleError = ""
+            )
+        }
+
+        pcToggleJob?.cancel()
+        pcToggleJob = viewModelScope.launch(Dispatchers.IO) {
+            val timeoutMs = 60_000L
+            val start = System.currentTimeMillis()
+            while (System.currentTimeMillis() - start < timeoutMs) {
+                try {
+                    delay(2000)
+                    if (PcStatusChecker.isReachable(settings.pcIp)) {
+                        // PC is reachable — boot complete
+                        _state.update {
+                            it.copy(
+                                pcToggleState = "idle",
+                                pcStatus = "reachable"
+                            )
+                        }
+                        broadcastTileState(true, switch.name)
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    // Ignore individual check failures
+                }
+            }
+            // Timeout — revert
+            _state.update {
+                it.copy(
+                    pcToggleState = "idle",
+                    pcToggleError = "PC bootete nicht innerhalb von 60 Sekunden",
+                    pcStatus = "unreachable"
+                )
+            }
+            Toast.makeText(ctx, "PC bootete nicht rechtzeitig", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Shutdown PC flow: press off, wait for unreachable, or timeout at 30s. */
+    private fun shutdownPc(switch: SwitchConfig) {
+        // Send shutdown command via HA entity
+        press(switch.secondaryEntity)
+        _state.update {
+            it.copy(
+                pcToggleState = "shutting_down",
+                pcToggleError = ""
+            )
+        }
+
+        pcToggleJob?.cancel()
+        pcToggleJob = viewModelScope.launch(Dispatchers.IO) {
+            val timeoutMs = 30_000L
+            val start = System.currentTimeMillis()
+            while (System.currentTimeMillis() - start < timeoutMs) {
+                try {
+                    delay(2000)
+                    if (!PcStatusChecker.isReachable(settings.pcIp)) {
+                        // PC is unreachable — shutdown complete
+                        _state.update {
+                            it.copy(
+                                pcToggleState = "idle",
+                                pcStatus = "unreachable"
+                            )
+                        }
+                        broadcastTileState(false, switch.name)
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    // Ignore individual check failures
+                }
+            }
+            // Timeout — revert
+            _state.update {
+                it.copy(
+                    pcToggleState = "idle",
+                    pcToggleError = "PC shut down nicht innerhalb von 30 Sekunden",
+                    pcStatus = "reachable"
+                )
+            }
+            Toast.makeText(ctx, "PC shut down nicht rechtzeitig", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun broadcastTileState(isOn: Boolean, switchName: String) {

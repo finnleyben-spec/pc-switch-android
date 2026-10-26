@@ -2,9 +2,13 @@ package dev.finnley.pcswitch.ui
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -32,14 +36,15 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
- * iOS-style toggle slider.
- * Shows on/off state via slider position only (no text).
- * Supports swipe/drag gesture to toggle.
+ * Physical-feel toggle with detent resistance at center.
+ * Knob follows finger with increasing resistance toward the middle.
+ * Crossing the 50% threshold triggers switch + vibration + snap to end.
  */
 @Composable
 fun EntityToggle(
     isOn: Boolean,
     enabled: Boolean,
+    transitioning: Boolean = false,
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -49,15 +54,35 @@ fun EntityToggle(
     val anim = remember { Animatable(if (isOn) 1f else 0f) }
     var animProgress by remember { mutableStateOf(anim.value) }
     var toggleWidth by remember { mutableStateOf(0.dp) }
+    var hasSwitched by remember { mutableStateOf(false) }
+
+    // Pulsing animation for transitioning state
+    val pulseTransition = rememberInfiniteTransition(label = "toggle_pulse")
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(600)),
+        label = "pulse_alpha"
+    )
 
     // Sync animation with state
     LaunchedEffect(isOn) {
-        animProgress = anim.value
+        // Snap to current visual position so drag switches animate from the
+        // crossed threshold, not from the opposite side.
+        anim.snapTo(animProgress)
         anim.animateTo(
             targetValue = if (isOn) 1f else 0f,
-            animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f)
+            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)
         ) {
             animProgress = value
+        }
+    }
+
+    // During transitioning, hold the knob in the middle
+    LaunchedEffect(transitioning) {
+        if (transitioning) {
+            anim.snapTo(0.5f)
+            animProgress = 0.5f
         }
     }
 
@@ -65,60 +90,82 @@ fun EntityToggle(
         modifier = modifier
             .height(60.dp)
             .clip(RoundedCornerShape(30.dp))
-            .background(if (isOn) Accent else SurfaceAlt)
+            .background(
+                if (transitioning) {
+                    Accent.copy(alpha = pulseAlpha)
+                } else if (isOn) {
+                    Accent
+                } else {
+                    SurfaceAlt
+                }
+            )
             .onGloballyPositioned { coords ->
                 val w = coords.size.width.toFloat() / density.density
                 if (w > 0f && toggleWidth != w.dp) {
                     toggleWidth = w.dp
                 }
             }
-            .pointerInput(enabled, toggleWidth) {
-                if (enabled) {
-                    // Knob is 52dp, padding is 4dp each side
-                    // Travel = toggle width - knob size - 8dp
+            .pointerInput(enabled, toggleWidth, isOn, transitioning) {
+                if (enabled && !transitioning) {
                     val travel = density.run {
                         (toggleWidth.value - 60f).dp.toPx()
                     }.coerceAtLeast(10f)
-                    detectHorizontalDragGestures(
+
+                    detectDragGestures(
                         onDragStart = {
-                            // Start tracking
+                            hasSwitched = false
                         },
-                        onHorizontalDrag = { change, dragAmount ->
+                        onDrag = { change, dragAmount ->
                             change.consume()
-                            // Track drag progress
-                            val current = anim.value
-                            val delta = dragAmount / travel
-                            val newProgress = (current + delta).coerceIn(0f, 1f)
-                            animProgress = newProgress
-                        },
-                        onDragEnd = {
-                            // Decide toggle based on final position
-                            val shouldToggle = if (isOn) {
+                            if (hasSwitched) return@detectDragGestures
+
+                            // Detent resistance near center (45%-55%)
+                            val detentFactor = if (animProgress in 0.45f..0.55f) {
+                                0.25f  // 4x resistance at detent
+                            } else if (animProgress in 0.35f..0.45f || animProgress in 0.55f..0.65f) {
+                                0.5f   // 2x resistance approaching detent
+                            } else {
+                                1.0f   // Normal movement
+                            }
+
+                            val delta = (dragAmount.x / travel) * detentFactor
+                            animProgress = (animProgress + delta).coerceIn(0f, 1f)
+
+                            // Check if crossed threshold (50%)
+                            val crossed = if (isOn) {
                                 animProgress < 0.5f
                             } else {
                                 animProgress > 0.5f
                             }
-                            if (shouldToggle) {
+
+                            if (crossed && !hasSwitched) {
+                                hasSwitched = true
                                 view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                                 onToggle(!isOn)
                             }
-                            // Snap back to correct position
-                            scope.launch {
-                                anim.animateTo(
-                                    targetValue = if (isOn) 1f else 0f,
-                                    animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f)
-                                ) {
-                                    animProgress = value
+                        },
+                        onDragEnd = {
+                            if (!hasSwitched) {
+                                // Spring back to original position
+                                scope.launch {
+                                    anim.animateTo(
+                                        targetValue = if (isOn) 1f else 0f,
+                                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f)
+                                    ) {
+                                        animProgress = value
+                                    }
                                 }
                             }
                         },
                         onDragCancel = {
-                            scope.launch {
-                                anim.animateTo(
-                                    targetValue = if (isOn) 1f else 0f,
-                                    animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f)
-                                ) {
-                                    animProgress = value
+                            if (!hasSwitched) {
+                                scope.launch {
+                                    anim.animateTo(
+                                        targetValue = if (isOn) 1f else 0f,
+                                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f)
+                                    ) {
+                                        animProgress = value
+                                    }
                                 }
                             }
                         }
