@@ -442,32 +442,21 @@ private fun SwitchCarousel(
                     }
                 }
 
-                // Toggle controls
-                if (switch.type == "toggle") {
-                    // Single toggle button
-                    ToggleButton(
-                        label = "Schalten",
-                        enabled = enabled,
-                        onClick = onToggleOn
-                    )
-                } else {
-                    // Dual buttons: On / Off
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        ToggleButton(
-                            label = "An",
-                            enabled = enabled,
-                            accent = true,
-                            onClick = onToggleOn,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ToggleButton(
-                            label = "Aus",
-                            enabled = enabled,
-                            onClick = onToggleOff,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+                // Toggle slider (same for all switch types)
+                EntityToggle(
+                    isOn = isOnState(state),
+                    enabled = enabled,
+                    onToggle = { newState ->
+                        if (newState) {
+                            onToggleOn()
+                        } else {
+                            onToggleOff()
+                        }
+                    },
+                    modifier = Modifier
+                        .width(80.dp)
+                        .align(Alignment.CenterHorizontally)
+                )
             }
         }
     }
