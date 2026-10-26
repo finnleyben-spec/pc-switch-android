@@ -39,8 +39,8 @@ fi
 
 # Step 2: Get current version code from build.gradle.kts
 echo "[2/9] Reading current version..."
-CURRENT_VERSION=$(grep "versionName" app/build.gradle.kts | head -1 | sed 's/.*"//' | sed 's/".*//')
-CURRENT_CODE=$(grep "versionCode" app/build.gradle.kts | head -1 | sed 's/versionCode = //')
+CURRENT_VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+CURRENT_CODE=$(grep -oP 'versionCode = \K[0-9]+' app/build.gradle.kts)
 echo "  Current: v$CURRENT_VERSION (code $CURRENT_CODE)"
 
 # Step 3: Bump version code
@@ -74,8 +74,8 @@ echo "  Signature valid"
 
 # Step 7: Verify version info in APK
 echo "[7/9] Verifying version info in APK..."
-APK_VERSION_NAME=$("$AAPT" dump badging "$SIGNED" | grep "versionName" | sed 's/versionName=//')
-APK_VERSION_CODE=$("$AAPT" dump badging "$SIGNED" | grep "versionCode" | sed 's/versionCode=//' | sed 's/versionCodeValue=//')
+APK_VERSION_NAME=$("$AAPT" dump badging "$SIGNED" | grep "package:" | grep -oP "versionName='\K[0-9.]+")
+APK_VERSION_CODE=$("$AAPT" dump badging "$SIGNED" | grep "package:" | grep -oP "versionCode='\K[0-9]+")
 echo "  APK versionName: $APK_VERSION_NAME"
 echo "  APK versionCode: $APK_VERSION_CODE"
 if [ "$APK_VERSION_NAME" != "$VERSION_NAME" ] || [ "$APK_VERSION_CODE" != "$NEW_CODE" ]; then
@@ -85,7 +85,7 @@ fi
 
 # Step 8: Create version.json
 echo "[8/9] Creating version.json..."
-VERSION_JSON=$(mktemp)
+VERSION_JSON="/tmp/version.json"
 cat > "$VERSION_JSON" << EOF
 {
   "versionCode": $NEW_CODE,
@@ -121,9 +121,13 @@ cp "$SIGNED" "$DIST_DIR/pc-switch-v${VERSION_NAME}.apk"
 
 echo "Committing changes..."
 cd "$REPO_DIR"
-git add app/build.gradle.kts
-git commit -m "v$VERSION_NAME: $CHANGELOG"
-git push origin main
+git add app/build.gradle.kts release.sh
+if ! git diff --quiet --cached; then
+    git commit -m "v$VERSION_NAME: $CHANGELOG"
+    git push origin main
+else
+    echo "  Nothing new to commit (changes already pushed)"
+fi
 
 echo ""
 echo "=== RELEASE COMPLETE ==="
