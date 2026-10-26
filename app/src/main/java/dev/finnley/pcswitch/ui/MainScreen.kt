@@ -325,27 +325,41 @@ private fun SwitchCarousel(
     val density = LocalDensity.current
     var dragOffset by remember { mutableStateOf(0f) }
 
-    // Swipe gesture detection
+    // Swipe gesture detection (only on top half, above toggle)
+    var dragEnabled by remember { mutableStateOf(true) }
     Box(
         Modifier
             .fillMaxSize()
             .pointerInput(switch.id) {
                 detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        // Only detect swipes in the top half (above toggle)
+                        dragEnabled = offset.y < size.height / 2
+                        if (dragEnabled) {
+                            dragOffset = 0f
+                        }
+                    },
                     onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        dragOffset += dragAmount
+                        if (dragEnabled) {
+                            change.consume()
+                            dragOffset += dragAmount
+                        }
                     },
                     onDragEnd = {
-                        val threshold = 80.dp.toPx()
-                        if (dragOffset < -threshold) {
-                            onNext()
-                        } else if (dragOffset > threshold) {
-                            onPrev()
+                        if (dragEnabled) {
+                            val threshold = 80.dp.toPx()
+                            if (dragOffset < -threshold) {
+                                onNext()
+                            } else if (dragOffset > threshold) {
+                                onPrev()
+                            }
+                            dragOffset = 0f
                         }
-                        dragOffset = 0f
+                        dragEnabled = true
                     },
                     onDragCancel = {
                         dragOffset = 0f
+                        dragEnabled = true
                     }
                 )
             }
