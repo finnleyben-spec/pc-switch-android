@@ -197,7 +197,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     fun pressOn() = press(settings.onEntity)
     fun pressOff() = press(settings.offEntity)
 
-    /** Press the primary (on) button of the current switch. For PC switches, checks actual status first. */
+    /** Press the primary (on) button of the current switch. For PC switches, checks actual status first (async). */
     fun pressCurrentSwitchOn() {
         val switches = _state.value.switches
         if (switches.isEmpty()) return
@@ -208,21 +208,25 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.pcToggleState != "idle") return
 
         if (isPcSwitch) {
-            // Check actual PC status before booting
-            val reachable = PcStatusChecker.isReachable(settings.pcIp)
-            if (reachable) {
-                // PC already on — just toggle normally (no booting state)
-                press(switch.primaryEntity)
-                _state.update {
-                    it.copy(
-                        lastAction = it.lastAction + (switch.id to "on"),
-                        switchStates = it.switchStates + (switch.id to "on")
-                    )
+            // Check PC status asynchronously to avoid blocking the UI thread
+            viewModelScope.launch {
+                val reachable = withContext(Dispatchers.IO) {
+                    PcStatusChecker.isReachable(settings.pcIp)
                 }
-                broadcastTileState(true, switch.name)
-            } else {
-                // PC is off — start boot flow
-                bootPc(switch)
+                if (reachable) {
+                    // PC already on — just toggle normally (no booting state)
+                    press(switch.primaryEntity)
+                    _state.update {
+                        it.copy(
+                            lastAction = it.lastAction + (switch.id to "on"),
+                            switchStates = it.switchStates + (switch.id to "on")
+                        )
+                    }
+                    broadcastTileState(true, switch.name)
+                } else {
+                    // PC is off — start boot flow
+                    bootPc(switch)
+                }
             }
         } else {
             press(switch.primaryEntity)
@@ -236,7 +240,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Press the secondary (off) button of the current switch. For PC switches, checks actual status first. */
+    /** Press the secondary (off) button of the current switch. For PC switches, checks actual status first (async). */
     fun pressCurrentSwitchOff() {
         val switches = _state.value.switches
         if (switches.isEmpty()) return
@@ -247,21 +251,25 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.pcToggleState != "idle") return
 
         if (isPcSwitch) {
-            // Check actual PC status before shutting down
-            val reachable = PcStatusChecker.isReachable(settings.pcIp)
-            if (reachable) {
-                // PC is on — start shutdown flow
-                shutdownPc(switch)
-            } else {
-                // PC already off — just toggle normally (no shutting_down state)
-                press(switch.primaryEntity)
-                _state.update {
-                    it.copy(
-                        lastAction = it.lastAction + (switch.id to "off"),
-                        switchStates = it.switchStates + (switch.id to "off")
-                    )
+            // Check PC status asynchronously to avoid blocking the UI thread
+            viewModelScope.launch {
+                val reachable = withContext(Dispatchers.IO) {
+                    PcStatusChecker.isReachable(settings.pcIp)
                 }
-                broadcastTileState(false, switch.name)
+                if (reachable) {
+                    // PC is on — start shutdown flow
+                    shutdownPc(switch)
+                } else {
+                    // PC already off — just toggle normally (no shutting_down state)
+                    press(switch.primaryEntity)
+                    _state.update {
+                        it.copy(
+                            lastAction = it.lastAction + (switch.id to "off"),
+                            switchStates = it.switchStates + (switch.id to "off")
+                        )
+                    }
+                    broadcastTileState(false, switch.name)
+                }
             }
         } else {
             if (switch.type == "dual" && switch.secondaryEntity.isNotBlank()) {
