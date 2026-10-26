@@ -6,21 +6,6 @@ import android.util.Base64
 import android.util.Log
 import org.json.JSONObject
 
-/**
- * Handles pcswitch:// deep links for setup and remote trigger.
- *
- * Setup:    pcswitch://setup?cfg=<base64 json>&autoconnect=1
- * Trigger:  pcswitch://trigger?press=on|off&switch=<name or index>
- *
- * Config JSON format:
- * {
- *   "ha_url": "192.168.0.1:8123",
- *   "ha_token": "long-lived-token",
- *   "switches": [
- *     { "name": "PC", "type": "dual", "primaryEntity": "switch.pc_power", "secondaryEntity": "switch.pc_off" }
- *   ]
- * }
- */
 object DeepLinkHandler {
     private const val TAG = "DeepLinkHandler"
     private const val SCHEME = "pcswitch"
@@ -36,8 +21,8 @@ object DeepLinkHandler {
         ) : Result()
 
         data class Trigger(
-            val press: String,  // "on" or "off"
-            val switchId: String?  // name or index as string
+            val press: String,
+            val switchId: String?
         ) : Result()
 
         data object Unknown : Result()
@@ -50,12 +35,9 @@ object DeepLinkHandler {
         val secondaryEntity: String
     )
 
-    /**
-     * Parse a deep link intent and return the appropriate Result.
-     * Returns null if the intent is not a pcswitch deep link.
-     */
     fun handle(intent: Intent): Result? {
         val uri = intent.data ?: return null
+        Log.i(TAG, "handle() called with URI: $uri")
         if (uri.scheme != SCHEME) return null
 
         return try {
@@ -74,7 +56,9 @@ object DeepLinkHandler {
     }
 
     private fun parseSetup(uri: Uri): Result.Setup {
+        Log.i(TAG, "parseSetup() called")
         val cfgParam = uri.getQueryParameter("cfg")
+        Log.i(TAG, "cfgParam: $cfgParam")
         val autoConnect = uri.getQueryParameter("autoconnect") == "1"
 
         var haUrl: String? = null
@@ -85,6 +69,7 @@ object DeepLinkHandler {
             try {
                 val decoded = Base64.decode(cfgParam, Base64.URL_SAFE or Base64.NO_WRAP)
                 val json = JSONObject(String(decoded))
+                Log.i(TAG, "Decoded JSON: $json")
 
                 haUrl = json.optString("ha_url", "")
                 if (haUrl.isEmpty()) haUrl = null

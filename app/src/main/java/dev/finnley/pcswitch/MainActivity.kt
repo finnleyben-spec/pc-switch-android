@@ -3,11 +3,13 @@ package dev.finnley.pcswitch
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.finnley.pcswitch.deeplink.DeepLinkHandler
@@ -15,8 +17,6 @@ import dev.finnley.pcswitch.notifications.NotificationHelper
 import dev.finnley.pcswitch.state.PcSwitchViewModel
 
 class MainActivity : ComponentActivity() {
-    private var vm: PcSwitchViewModel? = null
-
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -43,55 +43,86 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        val initialIntent = intent
+
         setContent {
             val model: PcSwitchViewModel = viewModel()
-            vm = model
-            PcSwitchApp(model)
-        }
 
-        // Handle deep link on first launch (after VM is created)
-        // setContent is synchronous, so VM is created before this line
-        if (vm != null) {
-            handleDeepLink(intent, vm!!)
+            // Handle deep link after ViewModel is created
+            LaunchedEffect(initialIntent) {
+                val result = DeepLinkHandler.handle(initialIntent)
+                if (result == null) {
+                    Log.i("MainActivity", "Deep link: null")
+                } else {
+                    when (result) {
+                        is DeepLinkHandler.Result.Setup -> {
+                            Log.i("MainActivity", "Deep link: Setup (onCreate)")
+                            model.handleSetupDeepLink(
+                                haUrl = result.haUrl,
+                                haToken = result.haToken,
+                                switches = result.switches,
+                                autoConnect = result.autoConnect
+                            )
+                            Toast.makeText(this@MainActivity, "Deep link: Setup applied", Toast.LENGTH_SHORT).show()
+                        }
+                        is DeepLinkHandler.Result.Trigger -> {
+                            Log.i("MainActivity", "Deep link: Trigger (onCreate)")
+                            model.handleTriggerDeepLink(
+                                press = result.press,
+                                switchId = result.switchId
+                            )
+                            Toast.makeText(this@MainActivity, "Deep link: Trigger sent", Toast.LENGTH_SHORT).show()
+                        }
+                        DeepLinkHandler.Result.Unknown -> {
+                            Log.i("MainActivity", "Deep link: Unknown")
+                        }
+                    }
+                }
+            }
+
+            PcSwitchApp(model)
         }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (vm != null) {
-            handleDeepLink(intent, vm!!)
+
+        setContent {
+            val model: PcSwitchViewModel = viewModel()
+
+            LaunchedEffect(intent) {
+                val result = DeepLinkHandler.handle(intent)
+                if (result == null) {
+                    Log.i("MainActivity", "Deep link: null (onNewIntent)")
+                } else {
+                    when (result) {
+                        is DeepLinkHandler.Result.Setup -> {
+                            Log.i("MainActivity", "Deep link: Setup (onNewIntent)")
+                            model.handleSetupDeepLink(
+                                haUrl = result.haUrl,
+                                haToken = result.haToken,
+                                switches = result.switches,
+                                autoConnect = result.autoConnect
+                            )
+                            Toast.makeText(this@MainActivity, "Deep link: Setup applied", Toast.LENGTH_SHORT).show()
+                        }
+                        is DeepLinkHandler.Result.Trigger -> {
+                            Log.i("MainActivity", "Deep link: Trigger (onNewIntent)")
+                            model.handleTriggerDeepLink(
+                                press = result.press,
+                                switchId = result.switchId
+                            )
+                            Toast.makeText(this@MainActivity, "Deep link: Trigger sent", Toast.LENGTH_SHORT).show()
+                        }
+                        DeepLinkHandler.Result.Unknown -> {
+                            Log.i("MainActivity", "Deep link: Unknown (onNewIntent)")
+                        }
+                    }
+                }
+            }
+
+            PcSwitchApp(model)
         }
-    }
-
-    private fun handleDeepLink(intent: android.content.Intent, model: PcSwitchViewModel) {
-        val result = DeepLinkHandler.handle(intent) ?: return
-
-        when (result) {
-            is DeepLinkHandler.Result.Setup -> {
-                model.handleSetupDeepLink(
-                    haUrl = result.haUrl,
-                    haToken = result.haToken,
-                    switches = result.switches,
-                    autoConnect = result.autoConnect
-                )
-                Toast.makeText(this, "Deep link: Setup applied", Toast.LENGTH_SHORT).show()
-            }
-            is DeepLinkHandler.Result.Trigger -> {
-                model.handleTriggerDeepLink(
-                    press = result.press,
-                    switchId = result.switchId
-                )
-                Toast.makeText(this, "Deep link: Trigger sent", Toast.LENGTH_SHORT).show()
-            }
-            DeepLinkHandler.Result.Unknown -> {
-                // Unknown deep link, ignore
-            }
-        }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        vm = null
     }
 }
