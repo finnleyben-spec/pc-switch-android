@@ -1,7 +1,11 @@
 package dev.finnley.pcswitch.ui
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -301,6 +305,10 @@ private fun switchStateLabel(state: String): String {
     }
 }
 
+private fun isOnState(state: String): Boolean {
+    return state.lowercase() in setOf("on", "true", "1", "active", "connected")
+}
+
 @Composable
 private fun SwitchCarousel(
     switch: SwitchConfig,
@@ -377,21 +385,41 @@ private fun SwitchCarousel(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                // Status text
+                // Status text with animated indicator
                 val isPcSwitch = switch.name.lowercase().contains("pc")
                 val displayState = if (isPcSwitch && pcStatus != "unknown") pcStatus else state
-                if (displayState != "unknown") {
-                    val label = if (displayState == "reachable") "An"
-                        else if (displayState == "unreachable") "Aus"
-                        else switchStateLabel(displayState)
-                    Text(
-                        label,
-                        fontSize = 14.sp,
-                        color = if (isPcSwitch && displayState == "reachable") Ok
-                                else if (isPcSwitch && displayState == "unreachable") Err
-                                else InkSoft,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                AnimatedContent(
+                    targetState = displayState,
+                    label = "switch_state_indicator",
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
+                    }
+                ) { state ->
+                    if (state != "unknown") {
+                        val label = if (state == "reachable") "An"
+                            else if (state == "unreachable") "Aus"
+                            else switchStateLabel(state)
+                        val dotColor = when {
+                            state == "reachable" -> Ok
+                            state == "unreachable" -> Err
+                            isOnState(state) -> Ok
+                            else -> InkSoft
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            StatusDot(dotColor)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                label,
+                                fontSize = 14.sp,
+                                color = if (state == "reachable") Ok
+                                    else if (state == "unreachable") Err
+                                    else InkSoft
+                            )
+                        }
+                    }
                 }
 
                 // Switch indicator dots
