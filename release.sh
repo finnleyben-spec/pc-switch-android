@@ -94,12 +94,14 @@ fi
 
 # Step 8: Create version.json
 echo "[8/10] Creating version.json..."
+APK_SHA256=$(sha256sum "$SIGNED" | awk '{print $1}')
 VERSION_JSON="/tmp/version.json"
 cat > "$VERSION_JSON" << EOF
 {
   "versionCode": $NEW_CODE,
   "versionName": "$VERSION_NAME",
   "url": "https://github.com/$GITHUB_REPO/releases/download/v${VERSION_NAME}/pc-switch-android-v${VERSION_NAME}.apk",
+  "sha256": "$APK_SHA256",
   "notes": "$CHANGELOG"
 }
 EOF
