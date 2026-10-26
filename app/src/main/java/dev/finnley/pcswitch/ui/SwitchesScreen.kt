@@ -206,6 +206,22 @@ private fun SwitchListItem(
                 modifier = Modifier.size(18.dp)
             )
 
+            // Entity type icon
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Accent.copy(alpha = 0.15f))
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    entityIcon(switchConfig.primaryEntity),
+                    tint = Accent,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
             // Switch name
             Column(Modifier.weight(1f)) {
                 Text(

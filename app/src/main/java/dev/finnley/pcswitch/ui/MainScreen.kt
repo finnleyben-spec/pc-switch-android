@@ -349,6 +349,24 @@ private fun SwitchCarousel(
                     .offset(x = dragOffset.dp),
                 verticalArrangement = Arrangement.Center
             ) {
+                // Entity type icon
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(Accent.copy(alpha = 0.15f))
+                        .padding(6.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .padding(bottom = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        entityIcon(switch.primaryEntity),
+                        tint = Accent,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
                 // Switch name
                 Text(
                     switch.name,

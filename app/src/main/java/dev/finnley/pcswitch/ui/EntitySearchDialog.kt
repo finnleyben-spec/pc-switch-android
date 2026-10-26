@@ -17,16 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Air
-import androidx.compose.material.icons.rounded.Android
-import androidx.compose.material.icons.rounded.BrightnessMedium
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.SwapVert
-import androidx.compose.material.icons.rounded.Window
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -219,16 +211,4 @@ private fun EntityItem(entity: EntityState, onClick: () -> Unit) {
             )
         }
     }
-}
-
-/** Get entity type icon based on domain prefix. */
-private fun entityIcon(entityId: String) = when {
-    entityId.startsWith("button.") || entityId.startsWith("input_button.") -> Icons.Rounded.PowerSettingsNew
-    entityId.startsWith("light.") -> Icons.Rounded.BrightnessMedium
-    entityId.startsWith("switch.") -> Icons.Rounded.SwapVert
-    entityId.startsWith("cover.") -> Icons.Rounded.Window
-    entityId.startsWith("lock.") -> Icons.Rounded.Lock
-    entityId.startsWith("fan.") -> Icons.Rounded.Air
-    entityId.startsWith("vacuum.") -> Icons.Rounded.Android
-    else -> Icons.Rounded.Settings
 }
