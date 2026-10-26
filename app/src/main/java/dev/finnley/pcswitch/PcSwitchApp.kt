@@ -79,7 +79,13 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     onAddSwitch = vm::addSwitch,
                     onEditSwitch = vm::updateSwitch,
                     onRemoveSwitch = vm::removeSwitch,
-                    onReorderSwitches = vm::reorderSwitches
+                    onReorderSwitches = vm::reorderSwitches,
+                    entitySearchLoading = state.entitySearchLoading,
+                    entitySearchError = state.entitySearchError,
+                    entitySearchResults = state.entitySearchResults,
+                    onSearchEntity = vm::openEntitySearch,
+                    onEntitySelected = vm::onEntitySelected,
+                    onEntitySearchDismiss = vm::closeEntitySearch
                 )
             }
 

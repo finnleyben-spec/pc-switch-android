@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -53,7 +55,13 @@ fun SwitchesScreen(
     onAddSwitch: (String, String, String, String) -> Unit,
     onEditSwitch: (SwitchConfig) -> Unit,
     onRemoveSwitch: (String) -> Unit,
-    onReorderSwitches: (Int, Int) -> Unit
+    onReorderSwitches: (Int, Int) -> Unit,
+    entitySearchLoading: Boolean = false,
+    entitySearchError: String? = null,
+    entitySearchResults: List<dev.finnley.pcswitch.ha.HaClient.EntityState> = emptyList(),
+    onSearchEntity: (String) -> Unit = {},
+    onEntitySelected: (String) -> Unit = {},
+    onEntitySearchDismiss: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var editingSwitch by remember { mutableStateOf<SwitchConfig?>(null) }
@@ -68,7 +76,13 @@ fun SwitchesScreen(
             onSave = { sw ->
                 onAddSwitch(sw.name, sw.type, sw.primaryEntity, sw.secondaryEntity)
                 showAddDialog = false
-            }
+            },
+            entitySearchLoading = entitySearchLoading,
+            entitySearchError = entitySearchError,
+            entitySearchResults = entitySearchResults,
+            onSearchEntity = onSearchEntity,
+            onEntitySelected = onEntitySelected,
+            onEntitySearchDismiss = onEntitySearchDismiss
         )
     }
 
@@ -80,7 +94,13 @@ fun SwitchesScreen(
             onSave = { updated ->
                 onEditSwitch(updated)
                 editingSwitch = null
-            }
+            },
+            entitySearchLoading = entitySearchLoading,
+            entitySearchError = entitySearchError,
+            entitySearchResults = entitySearchResults,
+            onSearchEntity = onSearchEntity,
+            onEntitySelected = onEntitySelected,
+            onEntitySearchDismiss = onEntitySearchDismiss
         )
     }
 
@@ -234,124 +254,196 @@ private fun SwitchDialog(
     title: String,
     switchConfig: SwitchConfig,
     onDismiss: () -> Unit,
-    onSave: (SwitchConfig) -> Unit
+    onSave: (SwitchConfig) -> Unit,
+    entitySearchLoading: Boolean,
+    entitySearchError: String?,
+    entitySearchResults: List<dev.finnley.pcswitch.ha.HaClient.EntityState>,
+    onSearchEntity: (String) -> Unit,
+    onEntitySelected: (String) -> Unit,
+    onEntitySearchDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(switchConfig.name) }
     var type by remember { mutableStateOf(switchConfig.type) }
     var primaryEntity by remember { mutableStateOf(switchConfig.primaryEntity) }
     var secondaryEntity by remember { mutableStateOf(switchConfig.secondaryEntity) }
     var stateEntity by remember { mutableStateOf(switchConfig.stateEntity) }
+    var searchTarget by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                title,
-                fontFamily = FontFamily.Serif,
-                fontSize = 18.sp,
-                color = Ink
-            )
-        },
-        text = {
-            Column(Modifier.fillMaxWidth()) {
-                GothicOutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name") },
-                    placeholder = { Text("z. B. Büro PC") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(10.dp))
-
-                // Type selector
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { type = "toggle" },
-                        enabled = true,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = if (type == "toggle") {
-                            ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
-                        } else {
-                            ButtonDefaults.buttonColors(containerColor = Surface, contentColor = InkSoft)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Toggle", fontSize = 13.sp)
-                    }
-                    Button(
-                        onClick = { type = "dual" },
-                        enabled = true,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = if (type == "dual") {
-                            ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
-                        } else {
-                            ButtonDefaults.buttonColors(containerColor = Surface, contentColor = InkSoft)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Dual", fontSize = 13.sp)
-                    }
+    // Entity search overlay
+    if (searchTarget != "") {
+        EntitySearchDialog(
+            title = when (searchTarget) {
+                "primary" -> "Primary Entity suchen"
+                "secondary" -> "Secondary Entity suchen"
+                "state" -> "State Entity suchen"
+                else -> "Entity suchen"
+            },
+            entities = entitySearchResults,
+            loading = entitySearchLoading,
+            error = entitySearchError,
+            onDismiss = {
+                searchTarget = ""
+                onEntitySearchDismiss()
+            },
+            onSelect = { entityId ->
+                when (searchTarget) {
+                    "primary" -> primaryEntity = entityId
+                    "secondary" -> secondaryEntity = entityId
+                    "state" -> stateEntity = entityId
                 }
-                Spacer(Modifier.height(10.dp))
-
-                GothicOutlinedTextField(
-                    value = primaryEntity,
-                    onValueChange = { primaryEntity = it },
-                    label = { Text("Primary Entity") },
-                    placeholder = { Text("button.buro_wake_pc") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                searchTarget = ""
+                onEntitySelected(entityId)
+                onEntitySearchDismiss()
+            }
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    title,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 18.sp,
+                    color = Ink
                 )
-                Spacer(Modifier.height(10.dp))
-
-                if (type == "dual") {
+            },
+            text = {
+                Column(Modifier.fillMaxWidth()) {
                     GothicOutlinedTextField(
-                        value = secondaryEntity,
-                        onValueChange = { secondaryEntity = it },
-                        label = { Text("Secondary Entity (Off)") },
-                        placeholder = { Text("input_button.pc_aus") },
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name") },
+                        placeholder = { Text("z. B. Büro PC") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(10.dp))
-                }
 
-                GothicOutlinedTextField(
-                    value = stateEntity,
-                    onValueChange = { stateEntity = it },
-                    label = { Text("State Entity (optional)") },
-                    placeholder = { Text("switch.buro_pc") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSave(
-                        switchConfig.copy(
-                            name = name,
-                            type = type,
-                            primaryEntity = primaryEntity,
-                            secondaryEntity = secondaryEntity,
-                            stateEntity = stateEntity
+                    // Type selector
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { type = "toggle" },
+                            enabled = true,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = if (type == "toggle") {
+                                ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
+                            } else {
+                                ButtonDefaults.buttonColors(containerColor = Surface, contentColor = InkSoft)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Toggle", fontSize = 13.sp)
+                        }
+                        Button(
+                            onClick = { type = "dual" },
+                            enabled = true,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = if (type == "dual") {
+                                ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White)
+                            } else {
+                                ButtonDefaults.buttonColors(containerColor = Surface, contentColor = InkSoft)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Dual", fontSize = 13.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+
+                    // Primary entity with search button
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) {
+                            GothicOutlinedTextField(
+                                value = primaryEntity,
+                                onValueChange = { primaryEntity = it },
+                                label = { Text("Primary Entity") },
+                                placeholder = { Text("button.buro_wake_pc") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(onClick = {
+                            searchTarget = "primary"
+                            onSearchEntity("primary")
+                        }) {
+                            Icon(Icons.Rounded.Search, tint = Accent, contentDescription = "Suche")
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+
+                    if (type == "dual") {
+                        // Secondary entity with search button
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) {
+                                GothicOutlinedTextField(
+                                    value = secondaryEntity,
+                                    onValueChange = { secondaryEntity = it },
+                                    label = { Text("Secondary Entity (Off)") },
+                                    placeholder = { Text("input_button.pc_aus") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(onClick = {
+                                searchTarget = "secondary"
+                                onSearchEntity("secondary")
+                            }) {
+                                Icon(Icons.Rounded.Search, tint = Accent, contentDescription = "Suche")
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                    }
+
+                    // State entity with search button
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) {
+                            GothicOutlinedTextField(
+                                value = stateEntity,
+                                onValueChange = { stateEntity = it },
+                                label = { Text("State Entity (optional)") },
+                                placeholder = { Text("switch.buro_pc") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(onClick = {
+                            searchTarget = "state"
+                            onSearchEntity("state")
+                        }) {
+                            Icon(Icons.Rounded.Search, tint = Accent, contentDescription = "Suche")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onSave(
+                            switchConfig.copy(
+                                name = name,
+                                type = type,
+                                primaryEntity = primaryEntity,
+                                secondaryEntity = secondaryEntity,
+                                stateEntity = stateEntity
+                            )
                         )
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Accent,
+                        contentColor = Color.White
                     )
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Accent,
-                    contentColor = Color.White
-                )
-            ) {
-                Text("Speichern")
+                ) {
+                    Text("Speichern")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = onDismiss) {
+                    Text("Abbrechen")
+                }
             }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
+        )
+    }
 }

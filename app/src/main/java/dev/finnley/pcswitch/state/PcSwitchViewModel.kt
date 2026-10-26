@@ -54,6 +54,12 @@ data class UiState(
     val downloadFailed: Boolean = false,
     val statusNote: String = "",
     val pcStatus: String = "unknown",  // "reachable" | "unreachable" | "unknown"
+    // Entity search state
+    val entitySearchLoading: Boolean = false,
+    val entitySearchError: String? = null,
+    val entitySearchResults: List<dev.finnley.pcswitch.ha.HaClient.EntityState> = emptyList(),
+    val showEntitySearch: Boolean = false,
+    val entitySearchTarget: String = ""  // "primary", "secondary", "state", "on", "off"
 )
 
 class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
@@ -275,6 +281,49 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     fun reorderSwitches(fromIndex: Int, toIndex: Int) {
         viewModelScope.launch {
             switchManager.reorderSwitches(fromIndex, toIndex)
+        }
+    }
+
+    // ---------- Entity Search ----------
+
+    fun openEntitySearch(target: String) {
+        _state.update { it.copy(showEntitySearch = true, entitySearchTarget = target) }
+        fetchEntities()
+    }
+
+    fun closeEntitySearch() {
+        _state.update { it.copy(showEntitySearch = false) }
+    }
+
+    fun onEntitySelected(entityId: String) {
+        // The caller will handle the entity selection based on target
+        closeEntitySearch()
+    }
+
+    private fun fetchEntities() {
+        viewModelScope.launch {
+            _state.update { it.copy(entitySearchLoading = true, entitySearchError = null) }
+            try {
+                val session = activeSession()
+                if (session == null || !session.alive.value) {
+                    _state.update {
+                        it.copy(
+                            entitySearchLoading = false,
+                            entitySearchError = "Keine Verbindung zu Home Assistant"
+                        )
+                    }
+                    return@launch
+                }
+                val entities = session.getEntityStates()
+                _state.update { it.copy(entitySearchLoading = false, entitySearchResults = entities) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        entitySearchLoading = false,
+                        entitySearchError = "Fehler beim Laden der Entities: ${e.message}"
+                    )
+                }
+            }
         }
     }
 

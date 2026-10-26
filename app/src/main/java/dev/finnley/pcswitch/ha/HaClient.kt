@@ -6,8 +6,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -228,6 +230,53 @@ object HaClient {
             }
         }
 
+        /** Fetch all entity IDs from HA via get_entity_ids command. */
+        suspend fun getEntityIds(): List<String> {
+            return withContext(Dispatchers.IO) {
+                val channel = Channel<List<String>>(1)
+                val id = ++reqId
+                pending[id] = { o ->
+                    val arr = o.optJSONArray("result")
+                    if (arr != null) {
+                        val list = mutableListOf<String>()
+                        for (i in 0 until arr.length()) {
+                            list.add(arr.optString(i))
+                        }
+                        channel.trySend(list)
+                    } else {
+                        channel.trySend(emptyList())
+                    }
+                }
+                ws?.send(JSONObject().put("id", id).put("type", "get_entity_ids").toString())
+                channel.receive()
+            }
+        }
+
+        /** Fetch all entity states (with friendly names from attributes). */
+        suspend fun getEntityStates(): List<EntityState> {
+            return withContext(Dispatchers.IO) {
+                val channel = Channel<List<EntityState>>(1)
+                val id = ++reqId
+                pending[id] = { o ->
+                    val arr = o.optJSONArray("result")
+                    if (arr != null) {
+                        val list = mutableListOf<EntityState>()
+                        for (i in 0 until arr.length()) {
+                            val s = arr.optJSONObject(i) ?: continue
+                            val attrs = s.optJSONObject("attributes")
+                            val friendlyName = attrs?.optString("friendly_name", "") ?: ""
+                            list.add(EntityState(s.optString("entity_id"), s.optString("state"), friendlyName))
+                        }
+                        channel.trySend(list)
+                    } else {
+                        channel.trySend(emptyList())
+                    }
+                }
+                ws?.send(JSONObject().put("id", id).put("type", "get_states").toString())
+                channel.receive()
+            }
+        }
+
         private suspend fun watchdog() {
             while (true) {
                 delay(5_000)
@@ -248,4 +297,11 @@ object HaClient {
             lastUpdate.value = System.currentTimeMillis()
         }
     }
+
+    /** Entity state with entity_id, state value, and friendly name. */
+    data class EntityState(
+        val entityId: String,
+        val state: String,
+        val friendlyName: String
+    )
 }
