@@ -468,7 +468,8 @@ private fun SwitchCarousel(
                         }
                     },
                     modifier = Modifier
-                        .width(80.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
                         .align(Alignment.CenterHorizontally)
                 )
             }

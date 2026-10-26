@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
@@ -47,10 +48,7 @@ fun EntityToggle(
     val density = LocalDensity.current
     val anim = remember { Animatable(if (isOn) 1f else 0f) }
     var animProgress by remember { mutableStateOf(anim.value) }
-
-    // Travel distance: toggle is 80dp, knob is 40dp, padding is 4dp each side
-    // So knob travels 32dp
-    val travelPx = density.run { 32.dp.toPx() }
+    var toggleWidth by remember { mutableStateOf(0.dp) }
 
     // Sync animation with state
     LaunchedEffect(isOn) {
@@ -65,11 +63,22 @@ fun EntityToggle(
 
     Box(
         modifier = modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .height(60.dp)
+            .clip(RoundedCornerShape(30.dp))
             .background(if (isOn) Accent else SurfaceAlt)
-            .pointerInput(enabled) {
+            .onGloballyPositioned { coords ->
+                val w = coords.size.width.toFloat() / density.density
+                if (w > 0f && toggleWidth != w.dp) {
+                    toggleWidth = w.dp
+                }
+            }
+            .pointerInput(enabled, toggleWidth) {
                 if (enabled) {
+                    // Knob is 52dp, padding is 4dp each side
+                    // Travel = toggle width - knob size - 8dp
+                    val travel = density.run {
+                        (toggleWidth.value - 60f).dp.toPx()
+                    }.coerceAtLeast(10f)
                     detectHorizontalDragGestures(
                         onDragStart = {
                             // Start tracking
@@ -78,7 +87,7 @@ fun EntityToggle(
                             change.consume()
                             // Track drag progress
                             val current = anim.value
-                            val delta = dragAmount / travelPx
+                            val delta = dragAmount / travel
                             val newProgress = (current + delta).coerceIn(0f, 1f)
                             animProgress = newProgress
                         },
@@ -122,9 +131,9 @@ fun EntityToggle(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(horizontal = 4.dp)
-                .offset(x = (animProgress * 32).dp)
-                .size(40.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .offset(x = (animProgress * (toggleWidth.value - 60f)).dp)
+                .size(52.dp)
+                .clip(RoundedCornerShape(26.dp))
                 .background(Color.White)
         )
     }
