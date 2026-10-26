@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import dev.finnley.pcswitch.BuildConfig
 import dev.finnley.pcswitch.ha.HaClient
 import dev.finnley.pcswitch.ha.HaClient.HaSession
+import dev.finnley.pcswitch.notifications.NotificationHelper
 import dev.finnley.pcswitch.pcstatus.PcStatusChecker
 import dev.finnley.pcswitch.state.SwitchManager
 import dev.finnley.pcswitch.state.SwitchConfig
@@ -81,6 +82,9 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     private var vpnJob: Job? = null
     private var updateJob: Job? = null
     private var sessionJobs = listOf<Job>()
+
+    // Track previous switch states for change detection
+    private var previousSwitchStates = mutableMapOf<String, String>()
 
     private val lanBase get() = settings.lanBase
     private val relayBase get() = settings.relayBase
@@ -201,6 +205,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 switchStates = it.switchStates + (switch.id to "on")
             )
         }
+        broadcastTileState(true, switch.name)
     }
 
     /** Press the secondary (off) button of the current switch. */
@@ -219,12 +224,21 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 switchStates = it.switchStates + (switch.id to "off")
             )
         }
+        broadcastTileState(false, switch.name)
     }
 
     private fun press(entity: String) {
         val s = activeSession() ?: return
         if (!s.alive.value) return
         s.press(entity)
+    }
+
+    private fun broadcastTileState(isOn: Boolean, switchName: String) {
+        val intent = android.content.Intent("dev.finnley.pcswitch.TILE_STATE_CHANGED")
+            .putExtra("is_on", isOn)
+            .putExtra("switch_name", switchName)
+            .setPackage(ctx.packageName)
+        ctx.sendBroadcast(intent)
     }
 
     // ---------- Switch Carousel ----------
@@ -597,13 +611,24 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         val m = s.entityStates.value
         val switches = _state.value.switches
         val switchStates = mutableMapOf<String, String>()
+        
+        // Detect state changes and send notifications
+        val changedSwitches = mutableListOf<Pair<SwitchConfig, String>>()
         for (sw in switches) {
             val state = when {
                 sw.stateEntity.isNotBlank() -> m[sw.stateEntity] ?: "unknown"
                 else -> m[sw.primaryEntity] ?: "unknown"
             }
             switchStates[sw.id] = state
+            
+            // Check if state changed from previous known state
+            val prev = previousSwitchStates[sw.id]
+            if (prev != null && prev != state && state != "unknown") {
+                changedSwitches.add(sw to state)
+            }
+            previousSwitchStates[sw.id] = state
         }
+        
         _state.update {
             it.copy(
                 switchStates = switchStates,
@@ -611,6 +636,22 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 offState = m[settings.offEntity] ?: "unknown",
                 lastUpdate = s.lastUpdate.value
             )
+        }
+        
+        // Send notifications for changed switches
+        for ((sw, state) in changedSwitches) {
+            NotificationHelper.sendSwitchNotification(ctx, sw.name, state, sw.id)
+        }
+        
+        // Broadcast current switch state to tile
+        val st = _state.value
+        if (switches.isNotEmpty()) {
+            val currentSwitch = switches[st.currentSwitchIndex]
+            val currentSwitchState = switchStates[currentSwitch.id]
+            if (currentSwitchState != null) {
+                val isOn = currentSwitchState == "on"
+                broadcastTileState(isOn, currentSwitch.name)
+            }
         }
     }
 
