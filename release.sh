@@ -9,6 +9,7 @@ REPO_DIR="/home/finnley/projects/pc-switch-android"
 DIST_DIR="/home/finnley/projects/pc-switch/dist"
 APPSIGNER="/home/finnley/android-sdk/build-tools/35.0.0/apksigner"
 AAPT="/home/finnley/android-sdk/build-tools/35.0.0/aapt"
+ZIPALIGN="/home/finnley/android-sdk/build-tools/35.0.0/zipalign"
 KEYSTORE="/home/finnley/projects/pc-switch-android/pcswitch-release.keystore"
 KEY_ALIAS="pcswitch"
 KEY_PASS="pcswitch2026"
@@ -27,7 +28,7 @@ echo "=== PC Switch Release: v$VERSION_NAME ==="
 echo ""
 
 # Step 1: Check git status
-echo "[1/9] Checking git status..."
+echo "[1/10] Checking git status..."
 cd "$REPO_DIR"
 if ! git status --porcelain -uno | grep -v "^$" > /dev/null; then
     echo "  Working tree is clean (untracked files ignored)"
@@ -38,26 +39,34 @@ else
 fi
 
 # Step 2: Get current version code from build.gradle.kts
-echo "[2/9] Reading current version..."
+echo "[2/10] Reading current version..."
 CURRENT_VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
 CURRENT_CODE=$(grep -oP 'versionCode = \K[0-9]+' app/build.gradle.kts)
 echo "  Current: v$CURRENT_VERSION (code $CURRENT_CODE)"
 
 # Step 3: Bump version code
 NEW_CODE=$((CURRENT_CODE + 1))
-echo "[3/9] Bumping version to v$VERSION_NAME (code $NEW_CODE)..."
+echo "[3/10] Bumping version to v$VERSION_NAME (code $NEW_CODE)..."
 sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/" app/build.gradle.kts
 sed -i "s/versionName = \"$CURRENT_VERSION\"/versionName = \"$VERSION_NAME\"/" app/build.gradle.kts
 echo "  Updated build.gradle.kts"
 
 # Step 4: Build APK
-echo "[4/9] Building APK (assembleRelease)..."
+echo "[4/10] Building APK (assembleRelease)..."
 ./gradlew assembleRelease --no-daemon
 echo "  Build complete"
 
-# Step 5: Sign APK
-echo "[5/9] Signing APK..."
 UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
+
+# Step 5: Zipalign APK
+echo "[5/10] Zipaligning APK..."
+ALIGNED="app/build/outputs/apk/release/app-release-aligned.apk"
+"$ZIPALIGN" -f -v 4 "$UNSIGNED" "$ALIGNED"
+echo "  APK aligned"
+
+# Step 6: Sign APK
+echo "[6/10] Signing APK..."
+UNSIGNED="$ALIGNED"
 SIGNED="app/build/outputs/apk/release/pc-switch-android-v${VERSION_NAME}.apk"
 "$APPSIGNER" sign \
     --ks "$KEYSTORE" \
@@ -67,13 +76,13 @@ SIGNED="app/build/outputs/apk/release/pc-switch-android-v${VERSION_NAME}.apk"
     --out "$SIGNED" "$UNSIGNED"
 echo "  APK signed: $SIGNED"
 
-# Step 6: Verify signature
-echo "[6/9] Verifying APK signature..."
+# Step 7: Verify signature
+echo "[7/10] Verifying APK signature..."
 "$APPSIGNER" verify "$SIGNED"
 echo "  Signature valid"
 
-# Step 7: Verify version info in APK
-echo "[7/9] Verifying version info in APK..."
+# Step 8: Verify version info in APK
+echo "[8/10] Verifying version info in APK..."
 APK_VERSION_NAME=$("$AAPT" dump badging "$SIGNED" | grep "package:" | grep -oP "versionName='\K[0-9.]+")
 APK_VERSION_CODE=$("$AAPT" dump badging "$SIGNED" | grep "package:" | grep -oP "versionCode='\K[0-9]+")
 echo "  APK versionName: $APK_VERSION_NAME"
@@ -84,7 +93,7 @@ if [ "$APK_VERSION_NAME" != "$VERSION_NAME" ] || [ "$APK_VERSION_CODE" != "$NEW_
 fi
 
 # Step 8: Create version.json
-echo "[8/9] Creating version.json..."
+echo "[8/10] Creating version.json..."
 VERSION_JSON="/tmp/version.json"
 cat > "$VERSION_JSON" << EOF
 {
@@ -96,7 +105,7 @@ cat > "$VERSION_JSON" << EOF
 EOF
 
 # Step 9: Upload to GitHub Releases
-echo "[9/9] Creating GitHub release v$VERSION_NAME..."
+echo "[9/10] Creating GitHub release v$VERSION_NAME..."
 gh release create "v$VERSION_NAME" \
     --repo "$GITHUB_REPO" \
     --title "PC Switch v$VERSION_NAME" \
