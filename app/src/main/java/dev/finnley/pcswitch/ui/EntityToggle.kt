@@ -2,7 +2,11 @@ package dev.finnley.pcswitch.ui
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -53,17 +57,19 @@ fun EntityToggle(
     var toggleWidth by remember { mutableStateOf(0.dp) }
     var hasSwitched by remember { mutableStateOf(false) }
 
-    // Pulsing animation for transitioning state
-    var pulse by remember { mutableStateOf(false) }
-    LaunchedEffect(transitioning) {
-        if (transitioning) {
-            while (true) {
-                delay(300)
-                pulse = !pulse
-            }
-        }
+    // Smooth breathing animation for transitioning state (modern, calm)
+    val pulseAlpha = if (transitioning) {
+        animateFloatAsState(
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = EaseInOut),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+            ),
+            label = "toggle_breathing"
+        ).value * 0.5f + 0.5f
+    } else {
+        0.5f
     }
-    val pulseAlpha = if (transitioning) (if (pulse) 1f else 0.4f) else 0.5f
 
     // Sync animation with state
     LaunchedEffect(isOn) {
