@@ -2,11 +2,13 @@ package dev.finnley.pcswitch.ui
 
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -410,17 +412,19 @@ private fun SwitchCarousel(
                 val displayState = if (isPcSwitch && pcStatus != "unknown") pcStatus else state
                 val isTransitioning = isPcSwitch && (pcToggleState == "booting" || pcToggleState == "shutting_down")
 
-                // Pulsing animation for transitioning state
-                var pulse by remember { mutableStateOf(false) }
-                LaunchedEffect(isTransitioning) {
-                    if (isTransitioning) {
-                        while (true) {
-                            delay(300)
-                            pulse = !pulse
-                        }
-                    }
+                // Smooth breathing animation for transitioning state (modern, calm)
+                val pulseAlpha = if (isTransitioning) {
+                    animateFloatAsState(
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1500, easing = EaseInOut),
+                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                        ),
+                        label = "breathing_pulse"
+                    ).value * 0.5f + 0.5f
+                } else {
+                    1f
                 }
-                val pulseAlpha = if (isTransitioning) (if (pulse) 1f else 0.3f) else 1f
 
                 AnimatedContent(
                     targetState = displayState,
