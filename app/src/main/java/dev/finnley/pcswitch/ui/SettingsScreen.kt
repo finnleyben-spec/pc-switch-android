@@ -90,18 +90,13 @@ fun SettingsScreen(
                 )
             },
             confirmButton = {
-                Button(
+                GothicButton(
+                    text = "Jetzt updaten",
                     onClick = {
                         showChangelog = false
                         onDownloadUpdate()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Accent,
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Jetzt updaten")
-                }
+                    }
+                )
             },
             dismissButton = {
                 OutlinedButton(onClick = { showChangelog = false }) {
@@ -114,11 +109,10 @@ fun SettingsScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(Bg)
+            .background(Paper)
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        // Header
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, tint = Ink, contentDescription = "Zurück")
@@ -144,7 +138,6 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(24.dp))
 
-        // Version Info Card
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("Version")
@@ -159,7 +152,6 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // Home Assistant Settings Card
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("Home Assistant")
@@ -200,7 +192,6 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // Network Settings Card
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("Netzwerk")
@@ -228,7 +219,6 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // VPN Settings Card
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("OpenVPN")
@@ -246,7 +236,6 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // PC Status Section
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("PC Status")
@@ -269,31 +258,23 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // Save Button
-        Button(
+        GothicButton(
+            text = "Speichern",
             onClick = { onSave(editedLan, editedRelay, editedToken, editedOnEntity, editedOffEntity, editedVpnId, editedPcIp) },
-            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Speichern", fontSize = 14.sp)
-        }
+        )
         Spacer(Modifier.height(20.dp))
 
-        // Update Section
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("Update")
                 Spacer(Modifier.height(12.dp))
 
-                // Manual check button
-                Button(
+                GothicButton(
+                    text = "Auf Updates prüfen",
                     onClick = onCheckUpdate,
-                    enabled = !updateChecking,
-                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Auf Updates prüfen", fontSize = 14.sp)
-                }
+                )
                 Spacer(Modifier.height(8.dp))
 
                 if (updateAvailable != null) {
@@ -317,44 +298,33 @@ fun SettingsScreen(
                             color = Err
                         )
                         Spacer(Modifier.height(8.dp))
-                        OutlinedButton(
+                        GothicButton(
+                            text = "Erneut versuchen",
                             onClick = onRetryDownload,
-                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Erneut versuchen", fontSize = 13.sp)
-                        }
+                        )
                     } else {
-                        Button(
+                        GothicButton(
+                            text = "Jetzt updaten",
                             onClick = { showChangelog = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Accent,
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Jetzt updaten", fontSize = 14.sp)
-                        }
+                        )
                     }
                 }
             }
         }
         Spacer(Modifier.height(20.dp))
 
-        // Rollback Section
         if (hasPreviousVersion) {
             GothicCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp)) {
                     GothicLabel("Rollback")
                     Spacer(Modifier.height(12.dp))
-                    Button(
+                    GothicButton(
+                        text = "Zurück zur vorherigen Version",
                         onClick = onRollback,
-                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Zurück zur vorherigen Version", fontSize = 14.sp)
-                    }
+                    )
                 }
             }
         }

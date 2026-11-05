@@ -25,7 +25,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -34,12 +39,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 
 /**
- * Physical-feel toggle with detent resistance at center.
- * Knob follows finger with increasing resistance toward the middle.
- * Crossing the 50% threshold triggers switch + vibration + snap to end.
+ * Gothic cyber toggle with detent resistance and neon glow.
+ * Blue glow for transitioning state, red glow for active.
  */
 @Composable
 fun EntityToggle(
@@ -57,34 +60,43 @@ fun EntityToggle(
     var toggleWidth by remember { mutableStateOf(0.dp) }
     var hasSwitched by remember { mutableStateOf(false) }
 
-    // Smooth breathing animation for transitioning state (modern, calm)
+    // Breathing animation for transitioning state
     val pulseAlpha = if (transitioning) {
         animateFloatAsState(
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(1500, easing = EaseInOut),
+                animation = tween(1000, easing = EaseInOut),
                 repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
             ),
             label = "toggle_breathing"
-        ).value * 0.5f + 0.5f
+        ).value
     } else {
-        0.5f
+        0f
+    }
+
+    // Glow intensity for active state
+    val activeGlow = if (isOn && !transitioning) {
+        animateFloatAsState(
+            targetValue = 0.6f,
+            animationSpec = tween(300),
+            label = "active_glow"
+        ).value
+    } else {
+        0f
     }
 
     // Sync animation with state
     LaunchedEffect(isOn) {
-        // Snap to current visual position so drag switches animate from the
-        // crossed threshold, not from the opposite side.
         anim.snapTo(animProgress)
         anim.animateTo(
             targetValue = if (isOn) 1f else 0f,
-            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)
+            animationSpec = spring(dampingRatio = 0.5f, stiffness = 500f)
         ) {
             animProgress = value
         }
     }
 
-    // During transitioning, hold the knob in the middle
+    // During transitioning, hold the knob in the middle with blue glow
     LaunchedEffect(transitioning) {
         if (transitioning) {
             anim.snapTo(0.5f)
@@ -98,13 +110,35 @@ fun EntityToggle(
             .clip(RoundedCornerShape(30.dp))
             .background(
                 if (transitioning) {
-                    Accent.copy(alpha = pulseAlpha)
+                    Shutdown.copy(alpha = 0.3f + pulseAlpha * 0.3f)
                 } else if (isOn) {
-                    Accent
+                    Accent.copy(alpha = 0.8f + activeGlow * 0.2f)
                 } else {
                     SurfaceAlt
                 }
             )
+            .drawBehind {
+                // Neon glow effect around the toggle
+                val glowColor = if (transitioning) {
+                    Shutdown.copy(alpha = 0.4f + pulseAlpha * 0.3f)
+                } else if (isOn) {
+                    Glow.copy(alpha = activeGlow)
+                } else {
+                    Color.Transparent
+                }
+
+                if (glowColor.alpha > 0f) {
+                    val brush = Brush.radialGradient(
+                        colors = listOf(
+                            glowColor,
+                            glowColor.copy(alpha = 0f)
+                        ),
+                        center = Offset(size.width / 2, size.height / 2),
+                        radius = size.width / 2f * 1.5f
+                    )
+                    drawRect(brush)
+                }
+            }
             .onGloballyPositioned { coords ->
                 val w = coords.size.width.toFloat() / density.density
                 if (w > 0f && toggleWidth != w.dp) {
@@ -125,19 +159,17 @@ fun EntityToggle(
                             change.consume()
                             if (hasSwitched) return@detectDragGestures
 
-                            // Detent resistance near center (45%-55%)
                             val detentFactor = if (animProgress in 0.45f..0.55f) {
-                                0.25f  // 4x resistance at detent
+                                0.25f
                             } else if (animProgress in 0.35f..0.45f || animProgress in 0.55f..0.65f) {
-                                0.5f   // 2x resistance approaching detent
+                                0.5f
                             } else {
-                                1.0f   // Normal movement
+                                1.0f
                             }
 
                             val delta = (dragAmount.x / travel) * detentFactor
                             animProgress = (animProgress + delta).coerceIn(0f, 1f)
 
-                            // Check if crossed threshold (50%)
                             val crossed = if (isOn) {
                                 animProgress < 0.5f
                             } else {
@@ -146,13 +178,12 @@ fun EntityToggle(
 
                             if (crossed && !hasSwitched) {
                                 hasSwitched = true
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                 onToggle(!isOn)
                             }
                         },
                         onDragEnd = {
                             if (!hasSwitched) {
-                                // Spring back to original position
                                 scope.launch {
                                     anim.animateTo(
                                         targetValue = if (isOn) 1f else 0f,
@@ -179,7 +210,7 @@ fun EntityToggle(
                 }
             }
     ) {
-        // Slider knob
+        // Slider knob with glow
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
@@ -187,7 +218,27 @@ fun EntityToggle(
                 .offset(x = (animProgress * (toggleWidth.value - 60f)).dp)
                 .size(52.dp)
                 .clip(RoundedCornerShape(26.dp))
-                .background(Color.White)
+                .drawBehind {
+                    if (transitioning) {
+                        // Blue breathing glow in center during transition
+                        val brush = Brush.radialGradient(
+                            colors = listOf(
+                                Shutdown.copy(alpha = 0.8f),
+                                Shutdown.copy(alpha = 0f)
+                            ),
+                            center = Offset(size.width / 2, size.height / 2),
+                            radius = size.width / 2f * 1.2f
+                        )
+                        drawCircle(brush)
+                    }
+                }
+                .background(
+                    if (transitioning) {
+                        Shutdown.copy(alpha = 0.6f + pulseAlpha * 0.4f)
+                    } else {
+                        Color.White
+                    }
+                )
         )
     }
 }

@@ -16,11 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,17 +48,15 @@ fun SetupScreen(
     var vpnId by remember { mutableStateOf(initial.vpnProfileId) }
     var pcIp by remember { mutableStateOf(initial.pcIp) }
 
-    // Android back button goes back to main screen
     BackHandler { onBack() }
 
     Column(
         Modifier
             .fillMaxSize()
-            .background(Bg)
+            .background(Paper)
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        // Header with back button
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, tint = Ink, contentDescription = "Zurück")
@@ -87,7 +82,6 @@ fun SetupScreen(
         )
         Spacer(Modifier.height(24.dp))
 
-        // Home Assistant Settings Card
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("Home Assistant")
@@ -143,7 +137,6 @@ fun SetupScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // Network Settings Card
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("Netzwerk")
@@ -183,7 +176,6 @@ fun SetupScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // VPN Settings Card
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("OpenVPN")
@@ -207,7 +199,6 @@ fun SetupScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // PC Status Settings Card
         GothicCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 GothicLabel("PC Status")
@@ -231,18 +222,10 @@ fun SetupScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        // Save Button
-        Button(
+        GothicButton(
+            text = if (busy) "Speichere…" else "Speichern und starten",
             onClick = { onSave(lan, relay, token, onEntity, offEntity, vpnId, pcIp) },
-            enabled = !busy,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Accent,
-                contentColor = Color.White
-            ),
-            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (busy) "Speichere…" else "Speichern und starten", fontSize = 15.sp)
-        }
+        )
     }
 }

@@ -209,16 +209,12 @@ private fun SwitchListItem(
             // Entity type icon
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(Accent.copy(alpha = 0.15f))
-                    .padding(6.dp),
-                contentAlignment = Alignment.Center
+                    .size(48.dp)
+                    .padding(6.dp)
             ) {
-                Icon(
-                    entityIcon(switchConfig.primaryEntity),
-                    tint = Accent,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
+                EntityPixelIcon(
+                    switchConfig.primaryEntity,
+                    color = Accent
                 )
             }
 

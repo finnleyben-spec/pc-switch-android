@@ -382,18 +382,14 @@ private fun SwitchCarousel(
                 // Entity type icon
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .background(Accent.copy(alpha = 0.15f))
+                        .size(48.dp)
                         .padding(6.dp)
                         .align(Alignment.CenterHorizontally)
-                        .padding(bottom = 8.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(bottom = 8.dp)
                 ) {
-                    Icon(
-                        entityIcon(switch.primaryEntity),
-                        tint = Accent,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                    EntityPixelIcon(
+                        switch.primaryEntity,
+                        color = Accent
                     )
                 }
 

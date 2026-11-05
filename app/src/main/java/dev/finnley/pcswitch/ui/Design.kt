@@ -46,15 +46,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Dark design with warm paper-like text (inspired by high-end editorial/gothic design)
+// Tag Gothic Cyber: 70% gothic darkness, 30% cyber aggression
 val Bg = Color(0xFF0A0A0A)
-val Surface = Color(0xFF141210)
-val SurfaceAlt = Color(0xFF1A1612)
+val Paper = Color(0xFF141210)
+val Surface = Color(0xFF1A1612)
+val SurfaceAlt = Color(0xFF2A2018)
 val Ink = Color(0xFFFDF8EF)
 val InkSoft = Color(0xFFE8E0D0)
 val Line = Color(0xFF3A2E20)
-val Accent = Color(0xFFC4A96C)
+val Accent = Color(0xFFC4A96C)  // Premium gold
 val AccentSoft = Color(0xFFD4BC8A)
+val Glow = Color(0xFFFFD700)    // Neon gold for glow effects
+val Shutdown = Color(0xFF5C9CE6) // Cold blue for boot/shutdown states
 val Ok = Color(0xFF34D399)
 val Warn = Color(0xFFEAB308)
 val Err = Color(0xFFEF4444)
@@ -71,11 +74,34 @@ fun GothicCard(
     )
 }
 
+@Composable
+fun GothicButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (enabled) Accent else Accent.copy(alpha = 0.4f))
+            .then(if (enabled) Modifier.clickable { onClick() } else Modifier)
+            .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White
+        )
+    }
+}
+
 // Pixel-art gothic eye icon (open state)
 @Composable
 fun GothicEyeOpen(modifier: Modifier = Modifier, color: Color = Accent) {
     Box(modifier = modifier.size(48.dp)) {
-        // Draw using nested boxes for pixel-art effect
         Column(modifier = Modifier.fillMaxSize()) {
             repeat(12) { y ->
                 Row(modifier = Modifier.fillMaxWidth()) {
@@ -117,10 +143,6 @@ fun GothicEyeClosed(modifier: Modifier = Modifier, color: Color = Accent) {
 val pixelSize = 3.dp
 
 fun isOpenEyePixel(x: Int, y: Int): Boolean {
-    // Open eye: oval shape with pupil
-    // Upper arc: y=2, x=3..8; y=3, x=2..9
-    // Middle: y=4..7, x=1..10 with eye opening
-    // Lower arc: y=8, x=2..9; y=9, x=3..8
     return when (y) {
         2 -> x in 3..8
         3 -> x in 2..9
@@ -135,11 +157,8 @@ fun isOpenEyePixel(x: Int, y: Int): Boolean {
 }
 
 fun isClosedEyePixel(x: Int, y: Int): Boolean {
-    // Closed eye: same outer shape but with X through the middle
     val outer = isOpenEyePixel(x, y)
     if (!outer) return false
-    
-    // Replace pupil area with diagonal lines (X)
     if (y in 4..7) {
         if (y == 4) return x == 3 || x == 8
         if (y == 5) return x == 4 || x == 7
@@ -149,7 +168,7 @@ fun isClosedEyePixel(x: Int, y: Int): Boolean {
     return false
 }
 
-// OutlinedTextField styling with warm paper-like text
+// OutlinedTextField styling with gothic cyber theme
 @Composable
 fun GothicOutlinedTextField(
     value: String,

@@ -180,16 +180,12 @@ private fun EntityItem(entity: EntityState, onClick: () -> Unit) {
     ) {
         Box(
             modifier = Modifier
-                .size(36.dp)
-                .background(Accent.copy(alpha = 0.15f))
-                .padding(6.dp),
-            contentAlignment = Alignment.Center
+                .size(48.dp)
+                .padding(6.dp)
         ) {
-            Icon(
-                entityIcon(entity.entityId),
-                tint = Accent,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp)
+            EntityPixelIcon(
+                entity.entityId,
+                color = Accent
             )
         }
         Spacer(Modifier.width(12.dp))
