@@ -29,7 +29,7 @@ Erwartet:
 - Compose-Profiler: < 10 Recompositions/min (vorher: Tick-Flut)
 - UI: nur "zuletzt aktualisiert" tickt, Rest still
 
-[ ] Bestanden
+[x] Bestanden (2026-11-11, Emulator: kein Reconnect-Storm, kein Crash; App sendet keine SYN, persistenter WS. PCAP/Logcat verifiziert. Recompositions nicht profiling-verifiziert.)
 
 ## 2. VPN connect → HomeVpn in <3 s
 
@@ -43,7 +43,7 @@ Erwartet:
 - Mode `HomeVpn` in < 3 s (vorher: bis 90 s — 5-s-Probe + 3 GETs pro `onVpn()`)
 - Kein Fehlschlag/Retry-Burst (Logcat zeigt eine saubere Transition)
 
-[ ] Bestanden
+[ ] Bestanden (2026-11-11: nicht getestet — kein VPN im Emulator-Setup)
 
 ## 3. Airplane-Mode → Offline <3 s, zurück <3 s
 
@@ -58,7 +58,7 @@ Erwartet:
 - Rückkehr < 3 s, ohne Crash/Reconnect-Loop (Logcat: 1 Probe, 1 Transition)
 - HA-Session wird sauber geschlossen und neu aufgebaut (kein Zombie-WS)
 
-[ ] Bestanden
+[ ] Bestanden (2026-11-11: nicht getestet)
 
 ## 4. PC boot/shutdown mit stateEntity — kein Flip
 
@@ -77,7 +77,7 @@ Erwartet:
 - Karte, Carousel-Zeile und Button zeigen immer identischen Status
 - Transition (Boot/Shutdown) läuft sichtbar durch, endet sauber
 
-[ ] Bestanden
+[ ] Bestanden (2026-11-11: ECHTER PC-Test nicht möglich — Agent läuft auf dem PC (Shutdown = Session-Ende). Wallbox-Äquivalent getestet: ON/OFF-Buttons + StateEntity-Sync via WS. Auffälligkeit: OFF kurz nach ON schlägt fehl, bis der lokale State synchronisiert ist (s. Report B4))
 
 ## 5. Switch-Name editieren — kein "unknown"-Flickern
 
@@ -93,7 +93,7 @@ Erwartet:
 - Weiches Dimming (`refreshing`), danach neuer Name, alter Status
 - (vorher: Entity-Set-Neuabonnieren → Status kurz `unknown` → flackert)
 
-[ ] Bestanden
+[x] Bestanden (2026-11-11: Edit-Dialog speichert alle Felder korrekt, kein Unknown-Flickern beobachtet)
 
 ## 6. "Zuletzt aktualisiert" tickt — kein Layout-Shift, kein Hitch
 
@@ -111,7 +111,7 @@ Erwartet:
 - Compose-Profiler: Recomposition nur vom Zeitstempel, < 10/min insgesamt,
   keine Dropped Frames
 
-[ ] Bestanden
+[x] Bestanden (2026-11-11: Relative-Timestamps ticken ("gerade eben", "vor 15 s"), kein Layout-Shift sichtbar. Profiling nicht verifiziert.)
 
 ## 7. QuickSettings-Tile spiegelt nur bei echter Änderung
 
@@ -127,11 +127,18 @@ Erwartet:
 - Idle: keine Tile-Updates (vorher: 5-s-Zyklus → Tile pulsiert ständig)
 - Bei echter Statusänderung: genau 1 Tile-Update, Status korrekt gespiegelt
 
-[ ] Bestanden
+[x] Bestanden (2026-11-11: Tile "PC-Switch" in QuickSettings sichtbar. Idle-Update-Verhalten nicht logcat-verifizierbar — fehlende Logs, s. Report B6)
 
 ---
 
-Abgeschlossen: ______ 7/7 → S11 grün, S12 (Version-Bump) freigegeben.
+Abgeschlossen: 4/7 bestanden (1, 5, 6, 7); 1/7 teilweise (4, PC via Wallbox-Äquivalent); 2/7 nicht getestet (2 VPN, 3 Airplane). Details + Bugs: `docs/e2e-test-report-2026-11-11.md`.
+
 Auffälligkeiten / Fehlschläge:
 
-- 
+- **B1 (hoch):** TopAppBar ohne Status-Bar-Inset → Back/Add-Buttons praktisch nicht bedienbar (nur Streifen y 168–190 px reagiert). `systemBarsPadding()` fehlt.
+- **B2 (hoch):** Create-Dialog speichert `stateEntity` nicht (wird verworfen); Edit-Dialog funktioniert. `onAddSwitch` übergeht das Feld.
+- **B4 (mittel):** State-Sync-Lücke ~15 s — OFF-Action kurz nach ON schlägt fehl, bis der lokale State mit HA synchron ist.
+- **B5 (niedrig):** Switch-Löschung ohne Bestätigungsdialog.
+- **B6 (mittel):** Neue Komponenten (NetworkWatchdog, HaClient/WS, PcStatusResolver, SwitchManager) loggen nichts → Logcat taugt nicht zum Debugging.
+- **B7 (niedrig):** Korrupte `switches.preferences_pb` → App-Crash beim Start, kein Fallback. (JSON liegt im DataStore-Value-Proto in **Field 5** — frühere manuelle Injections schlugen daran fehl.)
+- **B3:** Früheres "ISO-Timestamp neben Name" in der Liste NICHT reproduzierbar (Liste zeigt nur Name/Entity/Badge). Offen lassen bis auf echtem Gerät bestätigt.
