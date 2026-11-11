@@ -251,8 +251,8 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- PC an / aus ----------
 
-    fun pressOn() = press(settings.onEntity)
-    fun pressOff() = press(settings.offEntity)
+    fun pressOn() = pressConfirmed(settings.onEntity)
+    fun pressOff() = pressConfirmed(settings.offEntity)
 
     /** Press the primary (on) button of the current switch. For PC switches, checks actual status first (async). */
     fun pressCurrentSwitchOn() {
@@ -272,28 +272,14 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (reachable) {
                     // PC already on — just toggle normally (no booting state)
-                    press(switch.primaryEntity)
-                    _state.update {
-                        it.copy(
-                            lastAction = it.lastAction + (switch.id to "on"),
-                            switchStates = it.switchStates + (switch.id to "on")
-                        )
-                    }
-                    broadcastTileState(true, switch.name)
+                    pressConfirmed(switch.primaryEntity, switch.id, "on", switch.name)
                 } else {
                     // PC is off — start boot flow
                     bootPc(switch)
                 }
             }
         } else {
-            press(switch.primaryEntity)
-            _state.update {
-                it.copy(
-                    lastAction = it.lastAction + (switch.id to "on"),
-                    switchStates = it.switchStates + (switch.id to "on")
-                )
-            }
-            broadcastTileState(true, switch.name)
+            pressConfirmed(switch.primaryEntity, switch.id, "on", switch.name)
         }
     }
 
@@ -318,20 +304,13 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                     shutdownPc(switch)
                 } else {
                     // PC already off — just toggle normally (no shutting_down state)
-                    press(switch.primaryEntity)
-                    _state.update {
-                        it.copy(
-                            lastAction = it.lastAction + (switch.id to "off"),
-                            switchStates = it.switchStates + (switch.id to "off")
-                        )
-                    }
-                    broadcastTileState(false, switch.name)
+                    pressConfirmed(switch.primaryEntity, switch.id, "off", switch.name)
                 }
             }
         } else {
-            if (switch.type == "dual") {
+            val entity = if (switch.type == "dual") {
                 if (switch.secondaryEntity.isNotBlank()) {
-                    press(switch.secondaryEntity)
+                    switch.secondaryEntity
                 } else {
                     // B4: Ohne OFF-Entity früher: primary (ON!) wird erneut gedrückt —
                     // stiller Fehltrigger. Jetzt: Action überspringen + Hinweis.
@@ -339,34 +318,63 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                     Toast.makeText(ctx, "Kein OFF-Entity hinterlegt", Toast.LENGTH_SHORT).show()
                     return
                 }
-            } else {
-                press(switch.primaryEntity)
-            }
-            _state.update {
-                it.copy(
-                    lastAction = it.lastAction + (switch.id to "off"),
-                    switchStates = it.switchStates + (switch.id to "off")
-                )
-            }
-            broadcastTileState(false, switch.name)
+            } else switch.primaryEntity
+            pressConfirmed(entity, switch.id, "off", switch.name)
         }
     }
 
-    private fun press(entity: String) {
+    /**
+     * B4-Fix: Press mit Zustellbestätigung. HaSession.press() wartet auf die HA-
+     * Result-Antwort (5s-Timeout; timeout → Zombie-Session wird erkannt + Reconnect).
+     * Optimistischer UI-State wird NUR gesetzt, wenn HA die Zustellung bestätigt.
+     * Bei Fehler: bis zu 3 Auto-Retries (3s Abstand), dann Toast — nie still verwerfen.
+     */
+    private fun pressConfirmed(
+        entity: String,
+        switchId: String? = null,
+        direction: String? = null,
+        switchName: String? = null,
+    ) {
         if (entity.isBlank()) return
-        val s = activeSession()
-        if (s == null || !s.alive.value) {
-            Log.w(TAG, "press($entity): no active HA session — skipped")
-            return
+        viewModelScope.launch {
+            var ok = sendPress(entity)
+            var attempt = 0
+            while (!ok && attempt < 3) {
+                attempt++
+                delay(3_000)
+                ok = sendPress(entity)
+            }
+            if (ok) {
+                _state.update {
+                    it.copy(
+                        lastAction = if (switchId != null && direction != null)
+                            it.lastAction + (switchId to direction) else it.lastAction,
+                        switchStates = if (switchId != null && direction != null)
+                            it.switchStates + (switchId to direction) else it.switchStates
+                    )
+                }
+                if (switchName != null && direction != null) {
+                    broadcastTileState(direction == "on", switchName)
+                }
+            } else {
+                Log.w(TAG, "press($entity) nach ${attempt + 1} Versuchen nicht zugestellt — keine Zustandsänderung")
+                Toast.makeText(ctx, "HA nicht erreichbar – Action nicht gesendet", Toast.LENGTH_SHORT).show()
+            }
         }
-        val ok = s.press(entity)
-        if (!ok) Log.w(TAG, "press($entity): WebSocket send failed")
+    }
+
+    /** WA: HA-Antwort abwarten. false = keine Session / send failed / Timeout (Zombie). */
+    private suspend fun sendPress(entity: String): Boolean {
+        val s = activeSession()
+        if (s == null) {
+            Log.w(TAG, "press($entity): no active HA session")
+            return false
+        }
+        return withContext(Dispatchers.IO) { s.press(entity) }
     }
 
     /** Boot PC flow: send WoL, wait for reachable, or timeout at 60s. */
     private fun bootPc(switch: SwitchConfig) {
-        // Send WoL packet via HA entity
-        press(switch.primaryEntity)
         _state.update {
             it.copy(
                 pcToggleState = "booting",
@@ -376,6 +384,20 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
         pcToggleJob?.cancel()
         pcToggleJob = viewModelScope.launch(Dispatchers.IO) {
+            // B4: WoL-Paket zählt nur als gesendet, wenn HA die Zustellung bestätigt
+            // (5s-Warte auf Result). Sonst sofort Fehler — nicht 60s auf ein Paket
+            // warten, das nie zugestellt wurde.
+            val ok = sendPress(switch.primaryEntity)
+            if (!ok) {
+                _state.update {
+                    it.copy(
+                        pcToggleState = "idle",
+                        pcToggleError = "HA nicht erreichbar – PC nicht gestartet"
+                    )
+                }
+                Toast.makeText(ctx, "HA nicht erreichbar – PC nicht gestartet", Toast.LENGTH_LONG).show()
+                return@launch
+            }
             val timeoutMs = 60_000L
             val start = System.currentTimeMillis()
             val hasStateEntity = switch.stateEntity.isNotBlank()
@@ -415,8 +437,6 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Shutdown PC flow: press off, wait for unreachable, or timeout at 30s. */
     private fun shutdownPc(switch: SwitchConfig) {
-        // Send shutdown command via HA entity
-        press(switch.secondaryEntity)
         _state.update {
             it.copy(
                 pcToggleState = "shutting_down",
@@ -426,6 +446,18 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
         pcToggleJob?.cancel()
         pcToggleJob = viewModelScope.launch(Dispatchers.IO) {
+            // B4: Shutdown-Command zählt nur als gesendet, wenn HA bestätigt.
+            val ok = sendPress(switch.secondaryEntity)
+            if (!ok) {
+                _state.update {
+                    it.copy(
+                        pcToggleState = "idle",
+                        pcToggleError = "HA nicht erreichbar – Shutdown nicht gesendet"
+                    )
+                }
+                Toast.makeText(ctx, "HA nicht erreichbar – Shutdown nicht gesendet", Toast.LENGTH_LONG).show()
+                return@launch
+            }
             val timeoutMs = 30_000L
             val start = System.currentTimeMillis()
             val hasStateEntity = switch.stateEntity.isNotBlank()

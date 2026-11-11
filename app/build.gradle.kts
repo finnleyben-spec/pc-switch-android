@@ -21,6 +21,13 @@ android {
             isMinifyEnabled = false
         }
     }
+    testOptions {
+        unitTests {
+            // B6-Logs in HaClient/NetworkWatchdog: android.util.Log in JVM-Tests
+            // darf Default-Werte liefern statt Exception zu werfen.
+            isReturnDefaultValues = true
+        }
+    }
     buildFeatures {
         buildConfig = true
         compose = true

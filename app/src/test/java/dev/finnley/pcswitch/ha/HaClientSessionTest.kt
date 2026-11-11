@@ -298,6 +298,71 @@ class HaClientSessionTest {
         s.stop()
     }
 
+    // ---------- S4: press mit Zustellbestätigung (B4) ----------
+
+    /** B4: press bekommt HA-Result success=true → true. */
+    @Test
+    fun press_confirmed_by_ha_returns_true() = runTest {
+        val factory = FakeWsFactory()
+        factory.onSend = { ws, text ->
+            val o = JSONObject(text)
+            if (o.optString("type") == "call_service") {
+                ws.message("""{"id":${o.optInt("id")},"type":"result","success":true}""")
+            }
+        }
+        val s = session(factory, this, setOf("switch.pc")) { testScheduler.currentTime }
+        s.start()
+        val ws = factory.connections.single()
+        ws.open()
+        ws.message("""{"type":"auth_ok"}""")
+        runCurrent()
+        assertTrue("press muss bestätigt werden", s.press("switch.pc"))
+        s.stop()
+    }
+
+    /** B4: press bekommt HA-Fehler (success=false) → false, Session bleibt alive. */
+    @Test
+    fun press_ha_error_returns_false() = runTest {
+        val factory = FakeWsFactory()
+        factory.onSend = { ws, text ->
+            val o = JSONObject(text)
+            if (o.optString("type") == "call_service") {
+                ws.message(
+                    """{"id":${o.optInt("id")},"type":"result","success":false,"message":"entity not found"}"""
+                )
+            }
+        }
+        val s = session(factory, this, setOf("switch.pc")) { testScheduler.currentTime }
+        s.start()
+        val ws = factory.connections.single()
+        ws.open()
+        ws.message("""{"type":"auth_ok"}""")
+        runCurrent()
+        assertFalse("HA-Fehler muss false liefern", s.press("switch.pc"))
+        assertTrue("Session bleibt alive (keine Netzwerk-Störung)", s.alive.value)
+        s.stop()
+    }
+
+    /** B4: keine Antwort in 5s → false + Session wird als tot markiert + Reconnect. */
+    @Test
+    fun press_timeout_marks_session_dead_and_reconnects() = runTest {
+        val factory = FakeWsFactory()
+        factory.clock = { testScheduler.currentTime }
+        val s = session(factory, this, setOf("switch.pc")) { testScheduler.currentTime }
+        s.start()
+        val ws = factory.connections.single()
+        ws.open()
+        ws.message("""{"type":"auth_ok"}""")
+        runCurrent()
+        // press blockiert bis zur 5s-Timeout (Virtual Time).
+        assertFalse("Timeout muss false liefern", s.press("switch.pc"))
+        assertFalse("Zombie-Session muss als tot markiert sein", s.alive.value)
+        advanceTimeBy(2_000)
+        runCurrent()
+        assertEquals("Reconnect muss eingeplant sein", 2, factory.connections.size)
+        s.stop()
+    }
+
     /** R11: Events halten die Drift unter 60s → kein volles get_states. */
     @Test
     fun drift_watchdog_no_fetch_within_60s_of_events() = runTest {

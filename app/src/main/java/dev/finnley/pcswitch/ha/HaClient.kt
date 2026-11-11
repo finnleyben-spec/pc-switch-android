@@ -179,25 +179,63 @@ object HaClient {
             if (ownsScope) scope.cancel()
         }
 
-        /** call_service: button.press, light.turn_on/off, switch.turn_on/off (Domain aus Entity ableiten). */
-        fun press(entity: String): Boolean {
-            val w = ws ?: return false
-            if (!authed) return false
+        /**
+         * call_service mit Antwort-Warte (B4-Fix): HA antwortet auf jedes id-gebeutete
+         * Request mit {type:"result",success:...}. 5s ohne Antwort → Socket ist ein
+         * Zombie (TCP tot, aber onFailure noch nicht gefeuert) → Session wird als
+         * tot markiert und reconnectet. Damit wird kein Press mehr stillschweigend
+         * in ein totes Socket geschickt (früher: ~15s-Blindfenster bis 15s-Ping).
+         */
+        suspend fun press(entity: String): Boolean {
+            val w = ws ?: run {
+                Log.w(TAG, "press($entity): kein WebSocket offen")
+                return false
+            }
+            if (!authed) {
+                Log.w(TAG, "press($entity): nicht authentifiziert")
+                return false
+            }
             val domain = entity.substringBefore('.', "")
             val service = when (domain) {
                 "button", "input_button" -> "press"
                 "light", "switch", "fan", "cover", "lock", "vacuum" -> "toggle"
                 else -> "press"
             }
-            val o = JSONObject()
-                .put("id", reqId.incrementAndGet())
-                .put("type", "call_service")
-                .put("domain", domain)
-                .put("service", service)
-                .put("service_data", JSONObject().put("entity_id", entity))
-            val sent = w.send(o.toString())
-            Log.d(TAG, "press($entity) service=$service -> ${if (sent) "queued" else "send failed"}")
-            return sent
+            val id = reqId.incrementAndGet()
+            val ch = Channel<Boolean>(1)
+            pending[id] = { o ->
+                val ok = o.optBoolean("success", false)
+                if (!ok) {
+                    Log.w(TAG, "press($entity): HA-Fehler: " +
+                        (o.optJSONObject("error")?.optString("message") ?: o.optString("message", "?")))
+                }
+                ch.trySend(ok)
+            }
+            val sent = w.send(
+                JSONObject()
+                    .put("id", id)
+                    .put("type", "call_service")
+                    .put("domain", domain)
+                    .put("service", service)
+                    .put("service_data", JSONObject().put("entity_id", entity))
+                    .toString()
+            )
+            if (!sent) {
+                pending.remove(id)
+                Log.w(TAG, "press($entity): send fehlgeschlagen (Socket geschlossen)")
+                return false
+            }
+            return try {
+                val ok = withTimeout(5_000) { ch.receive() }
+                Log.d(TAG, "press($entity) service=$service -> ${if (ok) "bestätigt" else "abgelehnt"}")
+                ok
+            } catch (e: CancellationException) {
+                pending.remove(id)
+                Log.w(TAG, "press($entity): keine Antwort in 5s → Zombie-Session, Reconnect")
+                alive.value = false
+                scheduleReconnect()
+                false
+            }
         }
 
         private fun scheduleReconnect() {
