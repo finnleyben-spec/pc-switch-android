@@ -7,9 +7,9 @@ set -e
 
 REPO_DIR="/home/finnley/projects/pc-switch-android"
 DIST_DIR="/home/finnley/projects/pc-switch/dist"
-APPSIGNER="/home/finnley/android-sdk/build-tools/35.0.0/apksigner"
-AAPT="/home/finnley/android-sdk/build-tools/35.0.0/aapt"
-ZIPALIGN="/home/finnley/android-sdk/build-tools/35.0.0/zipalign"
+APPSIGNER="/home/finnley/.android-sdk/build-tools/34.0.0/apksigner"
+AAPT="/home/finnley/.android-sdk/build-tools/34.0.0/aapt"
+ZIPALIGN="/home/finnley/.android-sdk/build-tools/34.0.0/zipalign"
 KEYSTORE="/home/finnley/projects/pc-switch-android/pcswitch-release.keystore"
 KEY_ALIAS="pcswitch"
 KEY_PASS="pcswitch2026"
