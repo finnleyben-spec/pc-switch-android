@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -82,6 +83,22 @@ fun MainScreen(
     val currentIndex = state.currentSwitchIndex
     val currentSwitch = if (switches.isNotEmpty()) switches[currentIndex] else null
     val currentSwitchState = currentSwitch?.let { state.switchStates[it.id] } ?: "unknown"
+
+    // R13 (Design 6.1): relative "zuletzt aktualisiert" — 15s-Tick in der reinen UI-Ebene, kein ViewModel-Job
+    val relTime = rememberRelativeTime(state.lastUpdate)
+
+    // Z4 (Design 6.2/6.3): weiches Dimming der Statusbereiche bei loading/refreshing
+    // (animateFloatAsState = GPU-compositable, kein Layout-Shift, kein Hitch)
+    val pcCardAlpha by animateFloatAsState(
+        targetValue = if (state.loading || state.refreshing) 0.6f else 1f,
+        animationSpec = tween(250, easing = EaseInOut),
+        label = "pc_card_dim"
+    )
+    val carouselAlpha by animateFloatAsState(
+        targetValue = if (state.refreshing) 0.6f else 1f,
+        animationSpec = tween(250, easing = EaseInOut),
+        label = "carousel_dim"
+    )
 
     Column(
         Modifier
@@ -168,8 +185,8 @@ fun MainScreen(
                         val displayState = if (isPcSwitch && state.pcStatus != "unknown") state.pcStatus else currentSwitchState
                         if (displayState != "unknown") {
                             Spacer(Modifier.height(6.dp))
-                            val label = if (displayState == "reachable") "An"
-                                else if (displayState == "unreachable") "Aus"
+                            val label = if (displayState == "on") "An"
+                                else if (displayState == "off") "Aus"
                                 else switchStateLabel(displayState)
                             Text(
                                 "${currentSwitch.name}: $label",
@@ -178,9 +195,14 @@ fun MainScreen(
                             )
                         }
                     }
-                    if (state.statusNote.isNotBlank()) {
+                    // R13: Zeitstempel an der bestehenden Statuszeile angehängt (gleiche Zeile, kein Layout-Shift)
+                    val statusLine = buildList {
+                        if (state.statusNote.isNotBlank()) add(state.statusNote)
+                        if (relTime.isNotEmpty()) add("aktualisiert $relTime")
+                    }.joinToString(" · ")
+                    if (statusLine.isNotBlank()) {
                         Spacer(Modifier.height(6.dp))
-                        Text(state.statusNote, fontSize = 13.sp, color = InkSoft)
+                        Text(statusLine, fontSize = 13.sp, color = InkSoft)
                     }
                 }
             }
@@ -205,10 +227,14 @@ fun MainScreen(
         }
         Spacer(Modifier.height(18.dp))
 
-        // PC Status card (direct network check, independent of HA)
-        val pcReachable = state.pcStatus == "reachable"
+        // PC Status card (resolved status, independent of HA polling)
+        val pcOn = state.pcStatus == "on"
         val pcUnknown = state.pcStatus == "unknown"
-        GothicCard(Modifier.fillMaxWidth()) {
+        GothicCard(
+            Modifier
+                .fillMaxWidth()
+                .alpha(pcCardAlpha)
+        ) {
             Row(
                 modifier = Modifier
                     .padding(16.dp)
@@ -223,18 +249,21 @@ fun MainScreen(
                     color = InkSoft
                 )
                 Text(
-                    if (pcReachable) "An" else if (pcUnknown) "—" else "Aus",
+                    buildString {
+                        append(if (pcOn) "An" else if (pcUnknown) "—" else "Aus")
+                        if (relTime.isNotEmpty()) append(" · $relTime")
+                    },
                     fontFamily = FontFamily.Serif,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (pcReachable) Ok else if (pcUnknown) InkSoft else Err
+                    color = if (pcOn) Ok else if (pcUnknown) InkSoft else Err
                 )
             }
         }
         Spacer(Modifier.height(18.dp))
 
         // ---------- Switch Carousel ----------
-        Box(Modifier.weight(1f)) {
+        Box(Modifier.weight(1f).alpha(carouselAlpha)) {
             if (currentSwitch != null) {
                 SwitchCarousel(
                     switch = currentSwitch,
@@ -313,6 +342,42 @@ private fun switchStateLabel(state: String): String {
 
 private fun isOnState(state: String): Boolean {
     return state.lowercase() in setOf("on", "true", "1", "active", "connected")
+}
+
+/**
+ * R13 (Design 6.1): relative Zeit für "zuletzt aktualisiert".
+ * <10 s → "gerade eben", <60 s → "vor X s", <3600 s → "vor X m", sonst → "vor X h".
+ * lastUpdate == 0L → "" (kein Suffix).
+ */
+private fun relativeTime(lastUpdate: Long, now: Long): String {
+    if (lastUpdate == 0L) return ""
+    val deltaSec = ((now - lastUpdate) / 1000).coerceAtLeast(0)
+    return when {
+        deltaSec < 10 -> "gerade eben"
+        deltaSec < 60 -> "vor $deltaSec s"
+        deltaSec < 3600 -> "vor ${deltaSec / 60} m"
+        else -> "vor ${deltaSec / 3600} h"
+    }
+}
+
+/**
+ * R13 (Design 6.1): 15s-Tick für relative Zeit — reine UI-Ebene (LaunchedEffect, kein ViewModel-Job).
+ * `now` wird nur aktualisiert, wenn sich das formatierte Ergebnis ändert (String-Vergleich)
+ * → max. 1 Text-Recomposition pro 15 s, sonst 0.
+ */
+@Composable
+private fun rememberRelativeTime(lastUpdate: Long): String {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(lastUpdate) {
+        while (true) {
+            delay(15_000)
+            val t = System.currentTimeMillis()
+            if (relativeTime(lastUpdate, t) != relativeTime(lastUpdate, now)) {
+                now = t
+            }
+        }
+    }
+    return relativeTime(lastUpdate, now)
 }
 
 @Composable
@@ -443,13 +508,26 @@ private fun SwitchCarousel(
                                 color = Accent.copy(alpha = pulseAlpha)
                             )
                         }
-                    } else if (state != "unknown") {
-                        val label = if (state == "reachable") "An"
-                            else if (state == "unreachable") "Aus"
+                    } else if (state == "unknown") {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            StatusDot(InkSoft.copy(alpha = 0.5f))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Unbekannt",
+                                fontSize = 14.sp,
+                                color = InkSoft
+                            )
+                        }
+                    } else {
+                        val label = if (state == "on") "An"
+                            else if (state == "off") "Aus"
                             else switchStateLabel(state)
                         val dotColor = when {
-                            state == "reachable" -> Ok
-                            state == "unreachable" -> Err
+                            isPcSwitch && state == "on" -> Ok
+                            isPcSwitch && state == "off" -> Err
                             isOnState(state) -> Ok
                             else -> InkSoft
                         }
@@ -462,8 +540,8 @@ private fun SwitchCarousel(
                             Text(
                                 label,
                                 fontSize = 14.sp,
-                                color = if (state == "reachable") Ok
-                                    else if (state == "unreachable") Err
+                                color = if (isPcSwitch && state == "on") Ok
+                                    else if (isPcSwitch && state == "off") Err
                                     else InkSoft
                             )
                         }
@@ -502,7 +580,7 @@ private fun SwitchCarousel(
 
                 // Toggle slider (use PC status for PC switch, plug state for others)
                 val toggleState = if (switch.name.lowercase().contains("pc") && pcStatus != "unknown") {
-                    if (pcStatus == "reachable") "on" else "off"
+                    if (pcStatus == "on") "on" else "off"
                 } else {
                     state
                 }
