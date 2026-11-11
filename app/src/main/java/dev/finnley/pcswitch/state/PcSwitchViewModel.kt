@@ -11,6 +11,8 @@ import dev.finnley.pcswitch.BuildConfig
 import dev.finnley.pcswitch.ha.HaClient
 import dev.finnley.pcswitch.ha.HaClient.HaSession
 import dev.finnley.pcswitch.notifications.NotificationHelper
+import dev.finnley.pcswitch.network.AndroidNetworkEventSource
+import dev.finnley.pcswitch.network.NetworkWatchdog
 import dev.finnley.pcswitch.pcstatus.PcStatusChecker
 import dev.finnley.pcswitch.pcstatus.PcStatusResolver
 import dev.finnley.pcswitch.state.SwitchManager
@@ -89,6 +91,13 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     )
     val state: StateFlow<UiState> = _state
 
+    /** Primäres VPN-Signal (S9/R4): true, wenn das Default-Netzwerk TRANSPORT_VPN
+     *  hat. Eventaktuell via NetworkWatchdog (750ms-Debounce) — die UI nutzt es
+     *  als Transport-Indikator statt vpnBusy (vpnBusy bleibt Button-Gate für
+     *  VPN-Switch-Aktionen connectToHome/disconnectHome). */
+    val vpnTransportActive: StateFlow<Boolean>
+        get() = networkWatchdog.vpnTransportActive
+
     private var lanSession: HaSession? = null
     private var relaySession: HaSession? = null
     private var probeJob: Job? = null
@@ -106,10 +115,21 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     // Session -> kein Rebuild (kein Teardown, kein "unknown"-Flicker).
     private var lastEntitySet: Set<String>? = null
 
+    // S9 (R4): WLAN/VPN eventgetrieben. Netzwerk-Events (WLAN-Wechsel, VPN
+    // up/down) triggern debounced sofortige Probes; vpnTransportActive ist
+    // das primäre VPN-Signal für die UI (ersetzt 90s-vpnBusy als Indikator).
+    private val networkWatchdog = NetworkWatchdog(AndroidNetworkEventSource(ctx), viewModelScope)
+
     private val lanBase get() = settings.lanBase
     private val relayBase get() = settings.relayBase
 
     init {
+        // S9 (R4): WLAN/VPN-Events -> sofortiger Probe (debounced 750ms).
+        // Callback läuft auf Dispatchers.IO (kein Main-Thread-Block); der
+        // Initial-Probe bei start() deckt Events vor dem ersten Callback ab.
+        networkWatchdog.start {
+            viewModelScope.launch(Dispatchers.IO) { probeOnce() }
+        }
         // Don't start sessions yet — wait for switches to load first
         probeJob = viewModelScope.launch(Dispatchers.IO) {
             var firstProbe = true
@@ -127,7 +147,9 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                         _state.update { it.copy(loading = false) }
                     }
                 }
-                delay(5_000)
+                // S9 (R4): 30s Safety-Net — Primärweg ist jetzt eventgetrieben
+                // (NetworkWatchdog triggert sofortige Probes bei WLAN/VPN-Events).
+                delay(30_000)
             }
         }
         // Adaptive PC-Status-Check (R8): ~3s während Transition (booting/
@@ -161,6 +183,21 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             delay(2000) // Wait a bit after startup
             checkForUpdate()
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // S9 (R4): sauber stoppen — Watchdog deregistriert den NetworkCallback,
+        // Jobs + HA-Sessions laufen nicht weiter (kein Zombie-Polling).
+        networkWatchdog.stop()
+        probeJob?.cancel()
+        pcStatusJob?.cancel()
+        pcToggleJob?.cancel()
+        vpnJob?.cancel()
+        updateJob?.cancel()
+        sessionJobs.forEach { it.cancel() }
+        lanSession?.stop()
+        relaySession?.stop()
     }
 
     // ---------- Connect to home / Heimnetz trennen ----------
@@ -855,10 +892,12 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun probeOnce() {
         val st = _state.value
-        if (st.inSetup || st.vpnBusy || st.mode == Mode.Connecting) return
+        if (st.inSetup) return
         val lanReachable = HaClient.probe(lanBase, false)
         val relayReachable = if (lanReachable) false else HaClient.probe(relayBase, true)
-        val vpn = onVpn()
+        // S9 (R4): VPN primär aus dem Event-Flag (NetworkWatchdog, 750ms-Debounce),
+        // onVpn() als Snapshot-Fallback (z.B. vor dem ersten Capability-Event).
+        val vpn = networkWatchdog.vpnTransportActive.value || onVpn()
         
         // Check for auth failure
         val lanAuthFailed = lanSession?.authFailed?.value == true
@@ -880,6 +919,11 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             relayReachable -> Mode.Remote
             else -> Mode.Offline
         }
+        // S9: Während VPN-Dialing (Connecting) kein Downgrade auf Offline —
+        // der 3s-Loop in connectToHome entscheidet das Endergebnis; Upgrades
+        // (HomeVpn/HomeLan/Remote) werden sofort übernommen, damit die
+        // VPN-Aktivierung <3s sichtbar wird (kein Offline-Flicker).
+        if (st.mode == Mode.Connecting && mode == Mode.Offline) return
         _state.update {
             it.copy(
                 mode = mode,
