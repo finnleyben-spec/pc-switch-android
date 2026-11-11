@@ -133,12 +133,12 @@ Erwartet:
 
 Abgeschlossen: 4/7 bestanden (1, 5, 6, 7); 1/7 teilweise (4, PC via Wallbox-Äquivalent); 2/7 nicht getestet (2 VPN, 3 Airplane). Details + Bugs: `docs/e2e-test-report-2026-11-11.md`.
 
-Auffälligkeiten / Fehlschläge:
+Auffälligkeiten / Fehlschläge → **Fixes (Branch `coder/e2e-bugfixes`):**
 
-- **B1 (hoch):** TopAppBar ohne Status-Bar-Inset → Back/Add-Buttons praktisch nicht bedienbar (nur Streifen y 168–190 px reagiert). `systemBarsPadding()` fehlt.
-- **B2 (hoch):** Create-Dialog speichert `stateEntity` nicht (wird verworfen); Edit-Dialog funktioniert. `onAddSwitch` übergeht das Feld.
-- **B4 (mittel):** State-Sync-Lücke ~15 s — OFF-Action kurz nach ON schlägt fehl, bis der lokale State mit HA synchron ist.
-- **B5 (niedrig):** Switch-Löschung ohne Bestätigungsdialog.
-- **B6 (mittel):** Neue Komponenten (NetworkWatchdog, HaClient/WS, PcStatusResolver, SwitchManager) loggen nichts → Logcat taugt nicht zum Debugging.
-- **B7 (niedrig):** Korrupte `switches.preferences_pb` → App-Crash beim Start, kein Fallback. (JSON liegt im DataStore-Value-Proto in **Field 5** — frühere manuelle Injections schlugen daran fehl.)
-- **B3:** Früheres "ISO-Timestamp neben Name" in der Liste NICHT reproduzierbar (Liste zeigt nur Name/Entity/Badge). Offen lassen bis auf echtem Gerät bestätigt.
+- **B1 (hoch) — FIXED:** TopAppBar ohne Status-Bar-Inset → Buttons nicht bedienbar. `systemBarsPadding()` auf Root-Layouts (Main/Switches/Settings). Auf Emulator verifiziert (Icon sichtbar, Tap öffnet Dialog).
+- **B2 (hoch) — FIXED:** Create-Dialog verworfen: `stateEntity` fehlte in der gesamten Create-Kette (`onAddSwitch` → ViewModel → SwitchManager → `newSwitch`). Auf Emulator verifiziert (DataStore enthält `stateEntity`).
+- **B4 (mittel) — ROOT CAUSE FIXED (1e9b807):** Ursprünglich "State-Sync-Lücke ~15 s" — **echte Ursache:** `press()` war fire-and-forget; Press-Requests gingen in Zombie-WebSockets (TCP tot, `onFailure` noch nicht gefeuert, blind bis 15 s Ping), wurden stillschweigend verworfen. Fix: `HaSession.press()` wartet jetzt auf die HA-Result-Antwort (5 s Timeout → Session als tot markiert + Reconnect), ViewModel setzt optimistischen State nur bei bestätigter Zustellung, 3 Auto-Retries + Toast bei Totalausfall, bootPc/shutdownPc brechen bei unbestätigtem Paket sofort ab. 3 neue Unit-Tests grün. **Emulator-Verifikation offen** (morgen).
+- **B5 (niedrig) — FIXED:** Switch-Löschung ohne Bestätigung → AlertDialog "Switch löschen?". Auf Emulator verifiziert (Abbrechen + Löschen).
+- **B6 (mittel) — FIXED:** Logs in HaClient (WS-Lifecycle, press), NetworkWatchdog, ViewModel (pcStatus-Entscheidung), SwitchManager (JSON-Fehler), DeepLinkHandler (Token maskiert), QS-Tile. `isReturnDefaultValues` für JVM-Tests.
+- **B7 (niedrig) — FIXED:** Korrupte `switches.preferences_pb` → Crash beim Start. try/catch in `observeSwitches()` + Reset auf leeren Store. Auf Emulator verifiziert (Recovery nach Korruption).
+- **B3:** Früheres "ISO-Timestamp neben Name" — NICHT reproduzierbar, ABER: rohe HA-States (z. B. ISO-Zeitstempel bei `input_button` ohne StateEntity) erscheinen als Status-Label auf der Hauptansicht. **Offen** — Kandidat für morgen (`switchStateLabel` normalisieren).
