@@ -33,11 +33,21 @@ sealed class Mode {
     data object Connecting : Mode()
 }
 
+/** Immutable Snapshot der UI-relevanten Entity-States (Coalescing, R5). */
+data class EntitySnapshot(
+    val switchStates: Map<String, String>,
+    val onState: String,
+    val offState: String
+)
+
 data class UiState(
     val inSetup: Boolean = false,
     val inSettings: Boolean = false,
     val inSwitches: Boolean = false,
     val loading: Boolean = true,
+    // Refresh-Indikator (Design S6): true während Probe/Session-Rebuild.
+    // Default-Wert hält die Public-API stabil.
+    val refreshing: Boolean = false,
     val authError: Boolean = false,
     val authErrorDismissed: Boolean = false,
     val mode: Mode = Mode.Offline,
@@ -87,8 +97,9 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     private var updateJob: Job? = null
     private var sessionJobs = listOf<Job>()
 
-    // Track previous switch states for change detection
-    private var previousSwitchStates = mutableMapOf<String, String>()
+    // Coalescing (R5): Zeitpunkt des letzten Emits. Echte Änderungen werden
+    // immer sofort emittet, identische Snapshots maximal 1x/30s (Heartbeat).
+    private var lastEmitAt: Long = 0
 
     private val lanBase get() = settings.lanBase
     private val relayBase get() = settings.relayBase
@@ -756,51 +767,44 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Coalescing (R5): Emit nur bei echter Änderung (Snapshot-Vergleich)
+     * oder 1x/30s (Heartbeat, hält lastUpdate frisch). Notification und
+     * Tile-Broadcast nur bei tatsächlicher Änderung.
+     */
     private fun emitEntityStates() {
         val s = activeSession() ?: return
-        val m = s.entityStates.value
-        val switches = _state.value.switches
-        val switchStates = mutableMapOf<String, String>()
-        
-        // Detect state changes and send notifications
-        val changedSwitches = mutableListOf<Pair<SwitchConfig, String>>()
-        for (sw in switches) {
-            val state = when {
-                sw.stateEntity.isNotBlank() -> m[sw.stateEntity] ?: "unknown"
-                else -> m[sw.primaryEntity] ?: "unknown"
-            }
-            switchStates[sw.id] = state
-            
-            // Check if state changed from previous known state
-            val prev = previousSwitchStates[sw.id]
-            if (prev != null && prev != state && state != "unknown") {
-                changedSwitches.add(sw to state)
-            }
-            previousSwitchStates[sw.id] = state
-        }
-        
+        val st = _state.value
+        val switches = st.switches
+        val snap = buildSnapshot(s.entityStates.value, switches, settings.onEntity, settings.offEntity)
+        val current = EntitySnapshot(st.switchStates, st.onState, st.offState)
+        val now = System.currentTimeMillis()
+        if (!shouldEmit(snap, current, lastEmitAt, now)) return
+        lastEmitAt = now
         _state.update {
             it.copy(
-                switchStates = switchStates,
-                onState = m[settings.onEntity] ?: "unknown",
-                offState = m[settings.offEntity] ?: "unknown",
-                lastUpdate = s.lastUpdate.value
+                switchStates = snap.switchStates,
+                onState = snap.onState,
+                offState = snap.offState,
+                lastUpdate = now
             )
         }
-        
-        // Send notifications for changed switches
-        for ((sw, state) in changedSwitches) {
-            NotificationHelper.sendSwitchNotification(ctx, sw.name, state, sw.id)
+        if (snap == current) return // Heartbeat: nur lastUpdate aktualisieren
+
+        // Notifications für Switches, deren State sich tatsächlich geändert hat
+        for (sw in switches) {
+            val newState = snap.switchStates[sw.id]
+            if (newState != null && newState != "unknown" && newState != current.switchStates[sw.id]) {
+                NotificationHelper.sendSwitchNotification(ctx, sw.name, newState, sw.id)
+            }
         }
-        
-        // Broadcast current switch state to tile
-        val st = _state.value
+
+        // Broadcast current switch state to tile (nur bei echter Änderung)
         if (switches.isNotEmpty()) {
             val currentSwitch = switches[st.currentSwitchIndex]
-            val currentSwitchState = switchStates[currentSwitch.id]
+            val currentSwitchState = snap.switchStates[currentSwitch.id]
             if (currentSwitchState != null) {
-                val isOn = currentSwitchState == "on"
-                broadcastTileState(isOn, currentSwitch.name)
+                broadcastTileState(currentSwitchState == "on", currentSwitch.name)
             }
         }
     }
@@ -857,5 +861,51 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             false
         }
+    }
+
+    companion object {
+        /** Heartbeat-Intervall: identische Snapshots werden trotzdem 1x/30s
+         *  emittiert, damit lastUpdate frisch bleibt (R5). */
+        const val HEARTBEAT_MS = 30_000L
+
+        /**
+         * Mappt Entity-States auf einen UI-Snapshot.
+         * Regeln wie bisher: stateEntity vor primaryEntity, "unknown" wenn
+         * Entity nicht vorhanden. Pure Funktion (testbar ohne Android-Runtime).
+         */
+        fun buildSnapshot(
+            entityStates: Map<String, String>,
+            switches: List<SwitchConfig>,
+            onEntity: String,
+            offEntity: String
+        ): EntitySnapshot {
+            val switchStates = switches.associate { sw ->
+                val state = when {
+                    sw.stateEntity.isNotBlank() -> entityStates[sw.stateEntity] ?: "unknown"
+                    else -> entityStates[sw.primaryEntity] ?: "unknown"
+                }
+                sw.id to state
+            }
+            return EntitySnapshot(
+                switchStates = switchStates,
+                onState = entityStates[onEntity] ?: "unknown",
+                offState = entityStates[offEntity] ?: "unknown"
+            )
+        }
+
+        /**
+         * Soll [snap] emittiert werden?
+         * - Echte Änderung (unterschiedlich zu [current]) -> sofort
+         * - Identisch -> nur wenn Heartbeat-Frist (Default 30s) abgelaufen
+         * Pure Funktion (testbar ohne Android-Runtime).
+         */
+        fun shouldEmit(
+            snap: EntitySnapshot,
+            current: EntitySnapshot,
+            lastEmitAt: Long,
+            now: Long,
+            heartbeatMs: Long = HEARTBEAT_MS
+        ): Boolean =
+            snap != current || now - lastEmitAt >= heartbeatMs
     }
 }
