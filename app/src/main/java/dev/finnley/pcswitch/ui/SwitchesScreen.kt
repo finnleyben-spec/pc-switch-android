@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +54,7 @@ data class SwitchDragData(val switchId: String, val index: Int)
 fun SwitchesScreen(
     switches: List<SwitchConfig>,
     onBack: () -> Unit,
-    onAddSwitch: (String, String, String, String) -> Unit,
+    onAddSwitch: (String, String, String, String, String) -> Unit,
     onEditSwitch: (SwitchConfig) -> Unit,
     onRemoveSwitch: (String) -> Unit,
     onReorderSwitches: (Int, Int) -> Unit,
@@ -65,6 +66,8 @@ fun SwitchesScreen(
     onEntitySearchDismiss: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    // B5: Löschen erst nach Bestätigung (vorher: Trash-Icon löschte sofort)
+    var deleteTarget by remember { mutableStateOf<SwitchConfig?>(null) }
     var editingSwitch by remember { mutableStateOf<SwitchConfig?>(null) }
 
     BackHandler { onBack() }
@@ -75,7 +78,7 @@ fun SwitchesScreen(
             switchConfig = SwitchConfig("new", "", "dual", "", ""),
             onDismiss = { showAddDialog = false },
             onSave = { sw ->
-                onAddSwitch(sw.name, sw.type, sw.primaryEntity, sw.secondaryEntity)
+                onAddSwitch(sw.name, sw.type, sw.primaryEntity, sw.secondaryEntity, sw.stateEntity)
                 showAddDialog = false
             },
             entitySearchLoading = entitySearchLoading,
@@ -102,6 +105,30 @@ fun SwitchesScreen(
             onSearchEntity = onSearchEntity,
             onEntitySelected = onEntitySelected,
             onEntitySearchDismiss = onEntitySearchDismiss
+        )
+    }
+
+    // B5: Bestätigung vor endgültigem Löschen
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Switch löschen?") },
+            text = {
+                Text(
+                    "\"${target.name}\" wird dauerhaft entfernt.",
+                    color = InkSoft,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRemoveSwitch(target.id)
+                    deleteTarget = null
+                }) { Text("Löschen", color = Err) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("Abbrechen") }
+            }
         )
     }
 
@@ -164,7 +191,7 @@ fun SwitchesScreen(
                     switchConfig = switchConfig,
                     index = index,
                     onEdit = { editingSwitch = switchConfig },
-                    onRemove = { onRemoveSwitch(switchConfig.id) },
+                    onRemove = { deleteTarget = switchConfig }, // B5: erst bestätigen
                     onDragStart = { dragData ->
                         // Drag handling happens via modifier
                     },
