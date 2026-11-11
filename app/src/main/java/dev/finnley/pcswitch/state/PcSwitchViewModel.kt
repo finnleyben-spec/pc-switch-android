@@ -98,8 +98,12 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     private var sessionJobs = listOf<Job>()
 
     // Coalescing (R5): Zeitpunkt des letzten Emits. Echte Änderungen werden
-    // immer sofort emittet, identische Snapshots maximal 1x/30s (Heartbeat).
+    // immer sofort emittiert, identische Snapshots maximal 1x/30s (Heartbeat).
     private var lastEmitAt: Long = 0
+
+    // R12-lite: zuletzt genutztes Entity-Set. Identisches Set + lebende
+    // Session -> kein Rebuild (kein Teardown, kein "unknown"-Flicker).
+    private var lastEntitySet: Set<String>? = null
 
     private val lanBase get() = settings.lanBase
     private val relayBase get() = settings.relayBase
@@ -729,33 +733,23 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         lanSession?.takeIf { it.alive.value } ?: relaySession?.takeIf { it.alive.value }
 
     private fun startSessions() {
+        val token = settings.token
+        val entitySet = buildEntitySet(_state.value.switches)
+        // R12-lite: Set unverändert + Session lebt -> Rebuild komplett überspringen
+        // (kein Teardown, kein "unknown"-Flicker bei no-op-Writes wie Name-Edits).
+        val currentLan = lanSession
+        if (entitySet == lastEntitySet && currentLan != null && currentLan.alive.value) return
+        lastEntitySet = entitySet
         lanSession?.stop()
         relaySession?.stop()
         lanSession = null
         relaySession = null
-        _state.update {
-            it.copy(
-                onState = "unknown",
-                offState = "unknown",
-                lastUpdate = 0,
-                switchStates = emptyMap()
-            )
-        }
-        val token = settings.token
+        // State-Erhalt (R12-lite): alte switchStates/onState/offState bleiben
+        // (kein "unknown"-Reset); refreshing bis zum ersten Snapshot der Session.
+        _state.update { it.copy(refreshing = token.isNotBlank()) }
         if (token.isNotBlank()) {
-            val switches = _state.value.switches
-            val entities = mutableSetOf<String>()
-            entities.addAll(settings.entitySet())
-            for (sw in switches) {
-                if (sw.stateEntity.isNotBlank()) {
-                    entities.add(sw.stateEntity)
-                } else {
-                    // No state entity configured — use primary entity for state tracking
-                    entities.add(sw.primaryEntity)
-                }
-            }
-            lanSession = HaSession(lanBase, false, token, entities).also { it.start() }
-            relaySession = HaSession(relayBase, true, token, entities).also { it.start() }
+            lanSession = HaSession(lanBase, false, token, entitySet).also { it.start() }
+            relaySession = HaSession(relayBase, true, token, entitySet).also { it.start() }
         }
         sessionJobs.forEach { it.cancel() }
         sessionJobs = emptyList()
@@ -767,6 +761,21 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Entity-Set für die HA-Sessions: Settings-Entities + pro Switch state/primary-Entity. */
+    private fun buildEntitySet(switches: List<SwitchConfig>): Set<String> {
+        val entities = mutableSetOf<String>()
+        entities.addAll(settings.entitySet())
+        for (sw in switches) {
+            if (sw.stateEntity.isNotBlank()) {
+                entities.add(sw.stateEntity)
+            } else {
+                // No state entity configured — use primary entity for state tracking
+                entities.add(sw.primaryEntity)
+            }
+        }
+        return entities
+    }
+
     /**
      * Coalescing (R5): Emit nur bei echter Änderung (Snapshot-Vergleich)
      * oder 1x/30s (Heartbeat, hält lastUpdate frisch). Notification und
@@ -774,6 +783,9 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun emitEntityStates() {
         val s = activeSession() ?: return
+        // R12-lite: eine neue Session startet mit leerem Map; der all-"unknown"-
+        // Snapshot wird nicht emittiert, bis die ersten Daten ankommen (State-Erhalt).
+        if (s.entityStates.value.isEmpty()) return
         val st = _state.value
         val switches = st.switches
         val snap = buildSnapshot(s.entityStates.value, switches, settings.onEntity, settings.offEntity)
@@ -786,6 +798,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 switchStates = snap.switchStates,
                 onState = snap.onState,
                 offState = snap.offState,
+                refreshing = false, // erster Snapshot der Session angekommen
                 lastUpdate = now
             )
         }
