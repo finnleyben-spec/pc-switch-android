@@ -12,6 +12,7 @@ import dev.finnley.pcswitch.ha.HaClient
 import dev.finnley.pcswitch.ha.HaClient.HaSession
 import dev.finnley.pcswitch.notifications.NotificationHelper
 import dev.finnley.pcswitch.pcstatus.PcStatusChecker
+import dev.finnley.pcswitch.pcstatus.PcStatusResolver
 import dev.finnley.pcswitch.state.SwitchManager
 import dev.finnley.pcswitch.state.SwitchConfig
 import dev.finnley.pcswitch.update.UpdateManager
@@ -64,7 +65,7 @@ data class UiState(
     val downloadProgress: Int? = null,
     val downloadFailed: Boolean = false,
     val statusNote: String = "",
-    val pcStatus: String = "unknown",  // "reachable" | "unreachable" | "unknown"
+    val pcStatus: String = "unknown",  // "on" | "off" | "unknown" (R7: PcStatusResolver)
     // PC toggle transition state: idle, booting, shutting_down
     val pcToggleState: String = "idle",
     val pcToggleError: String = "",
@@ -129,11 +130,20 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 delay(5_000)
             }
         }
-        // Periodic PC status check (direct TCP, independent of HA)
+        // Adaptive PC-Status-Check (R8): ~3s während Transition (booting/
+        // shutting_down), ~15s im Steady-State; kein Probe bei offline/setup
+        // (kein Netzwerk -> Probe sinnlos, Status wird nicht aktualisiert).
         pcStatusJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
+                val s = _state.value
+                if (s.inSetup || s.mode == Mode.Offline) {
+                    delay(15_000)
+                    continue
+                }
+                val inTransition =
+                    s.pcToggleState == "booting" || s.pcToggleState == "shutting_down"
+                delay(if (inTransition) 3_000 else 15_000)
                 checkPcStatus()
-                delay(10_000)
             }
         }
         // Load switches and observe changes — start sessions after switches load
@@ -323,15 +333,20 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         pcToggleJob = viewModelScope.launch(Dispatchers.IO) {
             val timeoutMs = 60_000L
             val start = System.currentTimeMillis()
+            val hasStateEntity = switch.stateEntity.isNotBlank()
             while (System.currentTimeMillis() - start < timeoutMs) {
                 try {
                     delay(2000)
-                    if (PcStatusChecker.isReachable(settings.pcIp)) {
-                        // PC is reachable — boot complete
+                    val haState = if (hasStateEntity)
+                        activeSession()?.entityStates?.value?.get(switch.stateEntity)
+                    else null
+                    val tcp = PcStatusChecker.isReachable(settings.pcIp)
+                    if (PcTransition.isDone(haState, tcp, PcTransition.Phase.BOOT, hasStateEntity)) {
+                        // Boot fertig (HA-first, R12)
                         _state.update {
                             it.copy(
                                 pcToggleState = "idle",
-                                pcStatus = "reachable"
+                                pcStatus = PcStatusResolver.ON
                             )
                         }
                         broadcastTileState(true, switch.name)
@@ -346,7 +361,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     pcToggleState = "idle",
                     pcToggleError = "PC bootete nicht innerhalb von 60 Sekunden",
-                    pcStatus = "unreachable"
+                    pcStatus = PcStatusResolver.OFF
                 )
             }
             Toast.makeText(ctx, "PC bootete nicht rechtzeitig", Toast.LENGTH_LONG).show()
@@ -368,15 +383,20 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         pcToggleJob = viewModelScope.launch(Dispatchers.IO) {
             val timeoutMs = 30_000L
             val start = System.currentTimeMillis()
+            val hasStateEntity = switch.stateEntity.isNotBlank()
             while (System.currentTimeMillis() - start < timeoutMs) {
                 try {
                     delay(2000)
-                    if (!PcStatusChecker.isReachable(settings.pcIp)) {
-                        // PC is unreachable — shutdown complete
+                    val haState = if (hasStateEntity)
+                        activeSession()?.entityStates?.value?.get(switch.stateEntity)
+                    else null
+                    val tcp = PcStatusChecker.isReachable(settings.pcIp)
+                    if (PcTransition.isDone(haState, tcp, PcTransition.Phase.SHUTDOWN, hasStateEntity)) {
+                        // Shutdown fertig (HA-first, R12)
                         _state.update {
                             it.copy(
                                 pcToggleState = "idle",
-                                pcStatus = "unreachable"
+                                pcStatus = PcStatusResolver.OFF
                             )
                         }
                         broadcastTileState(false, switch.name)
@@ -391,7 +411,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     pcToggleState = "idle",
                     pcToggleError = "PC shut down nicht innerhalb von 30 Sekunden",
-                    pcStatus = "reachable"
+                    pcStatus = PcStatusResolver.ON
                 )
             }
             Toast.makeText(ctx, "PC shut down nicht rechtzeitig", Toast.LENGTH_LONG).show()
@@ -551,16 +571,23 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) { checkPcStatus() }
     }
 
-    /** Direct TCP check for PC reachability (port 22 or 80). Independent of HA. */
+    /**
+     * Kombiniert PC-Status (R7/R8): HA-StateEntity (primary) + TCP-Fallback
+     * -> genau "on" | "off" via PcStatusResolver. Ohne StateEntity rein TCP.
+     * Entity-State kommt aus der aktiven Session (LAN vor Relay).
+     */
     private fun checkPcStatus() {
         try {
-            val ip = settings.pcIp
-            val reachable = PcStatusChecker.isReachable(ip)
+            val st = _state.value
+            val stateEntity = st.switches.firstOrNull { it.stateEntity.isNotBlank() }?.stateEntity
+            val haState = stateEntity
+                ?.let { activeSession()?.entityStates?.value?.get(it) }
+            val reachable = PcStatusChecker.isReachable(settings.pcIp)
             _state.update {
-                it.copy(pcStatus = if (reachable) "reachable" else "unreachable")
+                it.copy(pcStatus = PcStatusResolver.resolve(haState, reachable))
             }
         } catch (e: Exception) {
-            _state.update { it.copy(pcStatus = "unknown") }
+            _state.update { it.copy(pcStatus = PcStatusResolver.UNKNOWN) }
         }
     }
 
