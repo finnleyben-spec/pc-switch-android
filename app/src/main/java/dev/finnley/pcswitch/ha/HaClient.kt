@@ -104,7 +104,7 @@ object HaClient {
         val authFailed = MutableStateFlow(false)
         /** Zeitpunkt des letzten Entity-Events/State-Sync (Drift-Watchdog, R11). */
         @Volatile
-        var lastEntityEventAt: Long = 0L
+        var lastEntityEventAt: Long = clock()
             private set
 
         private val url: String? = wsUrl(base, secureDefault)
@@ -124,6 +124,15 @@ object HaClient {
         private var watchdogJob: Job? = null
         @Volatile
         private var stopped = false
+        /** true: HA < 2023.10 → subscribe_events + get_states-Loop (Legacy-Pfad). */
+        @Volatile
+        private var legacyMode = false
+        /** true: erster subscribe_entities-Snapshot hat entityStates ersetzt (kein Merge). */
+        @Volatile
+        private var snapshotReplaced = false
+        /** id der subscribe_entities-Request (für Error-Fallback, R-legacy); 0 = keine. */
+        @Volatile
+        private var subscribeEntitiesId = 0
 
         fun start() {
             val u = url ?: return
@@ -202,14 +211,27 @@ object HaClient {
                     authFailed.value = false
                     alive.value = true
                     backoff.reset()
-                    getStates { applyStates(it.optJSONArray("result")) }
-                    w.send(
-                        JSONObject()
-                            .put("id", reqId.incrementAndGet())
-                            .put("type", "subscribe_events")
-                            .put("event_type", "state_changed")
-                            .toString()
-                    )
+                    snapshotReplaced = false
+                    if (entities.isEmpty()) {
+                        // Keine Entities: nichts abzubonnieren → Legacy subscribe_events.
+                        enterLegacyPath(w)
+                    } else {
+                        // HA >= 2023.10: subscribe_entities (R1+R6) — Server sendet
+                        // Init-Snapshot + komprimierte a/c/r-Diffs. Antwortet der Server
+                        // mit Fehler (ältere HA), wechselt der "result"-Handler in den
+                        // Legacy-Pfad (subscribe_events + get_states-Loop).
+                        legacyMode = false
+                        subscribeEntitiesId = reqId.incrementAndGet()
+                        val ids = JSONArray()
+                        for (e in entities) ids.put(e)
+                        w.send(
+                            JSONObject()
+                                .put("id", subscribeEntitiesId)
+                                .put("type", "subscribe_entities")
+                                .put("entity_ids", ids)
+                                .toString()
+                        )
+                    }
                     watchdogJob?.cancel()
                     watchdogJob = scope.launch { watchdog() }
                 }
@@ -222,19 +244,70 @@ object HaClient {
 
                 "result" -> {
                     val id = o.optInt("id", 0)
+                    if (id == subscribeEntitiesId) {
+                        subscribeEntitiesId = 0
+                        if (!o.optBoolean("success", false)) {
+                            // HA < 2023.10 kennt subscribe_entities nicht → Legacy-Pfad.
+                            enterLegacyPath(w)
+                        }
+                        return
+                    }
                     pending.remove(id)?.invoke(o)
                 }
 
                 "event" -> {
                     val ev = o.optJSONObject("event") ?: return
-                    val entity = ev.optString("entity_id")
-                    if (entity in entities) {
-                        val ns = ev.optJSONObject("new_state")
-                        entityStates.value =
-                            entityStates.value + (entity to (ns?.optString("state") ?: "unknown"))
-                        lastEntityEventAt = clock()
-                        lastUpdate.value = clock()
+                    val a = ev.optJSONObject("a")
+                    val c = ev.optJSONObject("c")
+                    val r = ev.optJSONArray("r")
+                    if (a == null && c == null && r == null) {
+                        // Legacy subscribe_events: state_changed-Event.
+                        val entity = ev.optString("entity_id")
+                        if (entity in entities) {
+                            val ns = ev.optJSONObject("new_state")
+                            entityStates.value =
+                                entityStates.value +
+                                    (entity to (ns?.optString("state") ?: "unknown"))
+                            lastEntityEventAt = clock()
+                            lastUpdate.value = clock()
+                        }
+                        return
                     }
+                    // subscribe_entities: komprimierte Diff-Nachrichten (HA >= 2023.10):
+                    //   a: {entity_id: {s: state, ...}}          (Addition/Init-Snapshot)
+                    //   c: {entity_id: {"+": {s: new_state, ...}}} (Change)
+                    //   r: [entity_id, ...]                      (Removal)
+                    val cur = HashMap(entityStates.value)
+                    if (a != null) {
+                        if (!snapshotReplaced) {
+                            cur.clear()  // erstes Payload ERSETZT den Store (kein Merge)
+                            snapshotReplaced = true
+                        }
+                        val keys = a.keys()
+                        while (keys.hasNext()) {
+                            val eid = keys.next()
+                            if (eid in entities) {
+                                cur[eid] = a.optJSONObject(eid)?.optString("s") ?: "unknown"
+                            }
+                        }
+                    }
+                    if (c != null) {
+                        val keys = c.keys()
+                        while (keys.hasNext()) {
+                            val eid = keys.next()
+                            if (eid in entities) {
+                                c.optJSONObject(eid)?.optJSONObject("+")
+                                    ?.optString("s")
+                                    ?.let { cur[eid] = it }
+                            }
+                        }
+                    }
+                    if (r != null) {
+                        for (i in 0 until r.length()) cur.remove(r.optString(i))
+                    }
+                    entityStates.value = cur
+                    lastEntityEventAt = clock()
+                    lastUpdate.value = clock()
                 }
             }
         }
@@ -322,12 +395,32 @@ object HaClient {
             }
         }
 
+        /**
+         * Drift-Watchdog (R11): Legacy-Modus → 5s-Vollpolling wie bisher.
+         * subscribe_entities-Modus → volles get_states nur, wenn >60s lang kein
+         * Entity-Event angekommen ist (drift); sonst läuft alles eventgetrieben.
+         */
         private suspend fun watchdog() {
             while (true) {
-                delay(5_000)
+                delay(if (legacyMode) 5_000L else 10_000L)
                 if (!alive.value) return
-                getStates { applyStates(it.optJSONArray("result")) }
+                if (legacyMode || clock() - lastEntityEventAt > 60_000L) {
+                    getStates { applyStates(it.optJSONArray("result")) }
+                }
             }
+        }
+
+        /** Legacy-Pfad (HA < 2023.10): subscribe_events + 5s-get_states-Loop wie heute. */
+        private fun enterLegacyPath(w: WebSocket) {
+            legacyMode = true
+            getStates { applyStates(it.optJSONArray("result")) }
+            w.send(
+                JSONObject()
+                    .put("id", reqId.incrementAndGet())
+                    .put("type", "subscribe_events")
+                    .put("event_type", "state_changed")
+                    .toString()
+            )
         }
 
         private fun applyStates(arr: JSONArray?) {
