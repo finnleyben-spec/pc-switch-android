@@ -1,6 +1,7 @@
 package dev.finnley.pcswitch.state
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -33,6 +34,7 @@ class SwitchManager(private val context: Context) {
         store.edit { prefs ->
             prefs[switchesKey] = serializeSwitches(switches)
         }
+        Log.d(TAG, "saved ${switches.size} switches")
     }
 
     /** Add a new switch. Returns its id. */
@@ -85,6 +87,7 @@ class SwitchManager(private val context: Context) {
             }
             result
         } catch (e: Exception) {
+            Log.e(TAG, "switches-JSON ungültig (${e::class.simpleName}: ${e.message}) — fahre mit leerer Liste fort", e)
             emptyList()
         }
     }
@@ -102,5 +105,9 @@ class SwitchManager(private val context: Context) {
             arr.put(obj)
         }
         return arr.toString()
+    }
+
+    companion object {
+        private const val TAG = "SwitchManager"
     }
 }

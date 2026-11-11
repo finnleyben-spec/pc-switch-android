@@ -69,12 +69,14 @@ object DeepLinkHandler {
             try {
                 val decoded = Base64.decode(cfgParam, Base64.URL_SAFE or Base64.NO_WRAP)
                 val json = JSONObject(String(decoded))
-                Log.i(TAG, "Decoded JSON: $json")
+                // Token NICHT im Log: nur Struktur + ha_url loggen
+                Log.i(TAG, "setup-config decoded: ha_url=${json.optString("ha_url")} switches=${json.optJSONArray("switches")?.length() ?: 0}")
 
                 haUrl = json.optString("ha_url", "")
                 if (haUrl.isEmpty()) haUrl = null
 
                 haToken = json.optString("ha_token", "")
+                Log.i(TAG, "token received (len=${haToken.length})") // nie den Token selbst loggen
                 if (haToken.isEmpty()) haToken = null
 
                 val switchesArr = json.optJSONArray("switches")
@@ -101,6 +103,7 @@ object DeepLinkHandler {
     private fun parseTrigger(uri: Uri): Result.Trigger {
         val press = uri.getQueryParameter("press") ?: ""
         val switchId = uri.getQueryParameter("switch")
+        Log.i(TAG, "parseTrigger: press=$press switch=$switchId")
         return Result.Trigger(press, switchId)
     }
 }

@@ -667,10 +667,13 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             val haState = stateEntity
                 ?.let { activeSession()?.entityStates?.value?.get(it) }
             val reachable = PcStatusChecker.isReachable(settings.pcIp)
+            val resolved = PcStatusResolver.resolve(haState, reachable)
+            Log.d(TAG, "pcStatus: ha=${haState ?: "-"} tcp=${if (reachable) "reachable" else "unreachable"} -> $resolved")
             _state.update {
-                it.copy(pcStatus = PcStatusResolver.resolve(haState, reachable))
+                it.copy(pcStatus = resolved)
             }
         } catch (e: Exception) {
+            Log.e(TAG, "checkPcStatus fehlgeschlagen: ${e.message}", e)
             _state.update { it.copy(pcStatus = PcStatusResolver.UNKNOWN) }
         }
     }

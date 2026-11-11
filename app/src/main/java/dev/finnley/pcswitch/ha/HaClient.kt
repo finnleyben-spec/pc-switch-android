@@ -2,6 +2,7 @@ package dev.finnley.pcswitch.ha
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger
  *   -> {"id":n,"type":"call_service","domain":"button","service":"press","entity_id":"..."}
  */
 object HaClient {
+
+    private const val TAG = "HaClient"
 
     /** HTTP-Erreichbarkeits-Probe gegen <base>/api/ (2xx/401/403 = erreichbar). */
     fun probe(base: String, secureDefault: Boolean): Boolean {
@@ -135,12 +138,17 @@ object HaClient {
         private var subscribeEntitiesId = 0
 
         fun start() {
-            val u = url ?: return
+            val u = url ?: run {
+                Log.e(TAG, "start(): keine gültige WS-URL aus Base — Connection übersprungen")
+                return
+            }
+            Log.d(TAG, "connect: $u")
             stopped = false
             ws = factory.newWebSocket(
                 Request.Builder().url(u).build(),
                 object : WebSocketListener() {
                     override fun onOpen(w: WebSocket, response: Response) {
+                        Log.d(TAG, "WS open — authenticating")
                         authed = false
                         w.send("""{"type":"auth","access_token":"$token"}""")
                     }
@@ -148,11 +156,13 @@ object HaClient {
                     override fun onMessage(w: WebSocket, text: String) = handle(w, text)
 
                     override fun onFailure(w: WebSocket, t: Throwable, response: Response?) {
+                        Log.w(TAG, "WS failure: ${t.message} (http=${response?.code})")
                         alive.value = false
                         if (!authFailed.value) scheduleReconnect()
                     }
 
                     override fun onClosed(w: WebSocket, code: Int, reason: String) {
+                        Log.w(TAG, "WS closed code=$code reason=\"$reason\"")
                         alive.value = false
                         if (!authFailed.value) scheduleReconnect()
                     }
@@ -185,13 +195,17 @@ object HaClient {
                 .put("domain", domain)
                 .put("service", service)
                 .put("service_data", JSONObject().put("entity_id", entity))
-            return w.send(o.toString())
+            val sent = w.send(o.toString())
+            Log.d(TAG, "press($entity) service=$service -> ${if (sent) "queued" else "send failed"}")
+            return sent
         }
 
         private fun scheduleReconnect() {
             if (stopped || authFailed.value || reconnectJob?.isActive == true) return
+            val d = backoff.nextDelayMs()
+            Log.d(TAG, "reconnect in ${d}ms")
             reconnectJob = scope.launch {
-                delay(backoff.nextDelayMs())
+                delay(d)
                 reconnectJob = null
                 if (stopped || authFailed.value) return@launch
                 ws?.cancel()
@@ -207,6 +221,7 @@ object HaClient {
             }
             when (o.optString("type")) {
                 "auth_ok" -> {
+                    Log.d(TAG, "authenticated (${if (entities.isEmpty()) "legacy" else "subscribe_entities"}, ${entities.size} entities)")
                     authed = true
                     authFailed.value = false
                     alive.value = true
@@ -237,6 +252,7 @@ object HaClient {
                 }
 
                 "auth_invalid" -> {
+                    Log.e(TAG, "auth_invalid — Token von HA abgelehnt, kein Reconnect")
                     alive.value = false
                     authFailed.value = true
                     w.close(4001, "auth_invalid")
@@ -331,6 +347,7 @@ object HaClient {
                     withTimeout(8_000) { ch.receive() }
                 } catch (e: CancellationException) {
                     pending.remove(id)  // Timeout oder Scope-Stop: kein Callback
+                    Log.w(TAG, "request '$type' (id=$id) ohne Antwort (8s-Timeout oder Stop)")
                     return@launch
                 }
                 pending.remove(id)
@@ -413,6 +430,7 @@ object HaClient {
         /** Legacy-Pfad (HA < 2023.10): subscribe_events + 5s-get_states-Loop wie heute. */
         private fun enterLegacyPath(w: WebSocket) {
             legacyMode = true
+            Log.d(TAG, "legacy mode (HA < 2023.10) — subscribe_events + 5s-Vollpolling")
             getStates { applyStates(it.optJSONArray("result")) }
             w.send(
                 JSONObject()

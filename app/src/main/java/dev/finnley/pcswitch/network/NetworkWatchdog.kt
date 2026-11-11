@@ -1,5 +1,6 @@
 package dev.finnley.pcswitch.network
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,11 +41,18 @@ class NetworkWatchdog(
     private var onNetworkChange: (() -> Unit)? = null
 
     private val listener = object : NetworkEventSource.Listener {
-        override fun onNetworkAvailable() = debounced()
+        override fun onNetworkAvailable() {
+            Log.d(TAG, "network available")
+            debounced()
+        }
 
-        override fun onLost() = debounced()
+        override fun onLost() {
+            Log.d(TAG, "network lost")
+            debounced()
+        }
 
         override fun onVpnTransportChanged(active: Boolean) {
+            Log.d(TAG, "vpn transport ${if (active) "active" else "inactive"}")
             vpnTransportActive.value = active
             debounced()
         }
@@ -64,7 +72,9 @@ class NetworkWatchdog(
         } catch (e: Exception) {
             // register kann selten werfen -> Watchdog inert,
             // das 30s-Safety-Intervall im ViewModel bleibt als Fallback
+            Log.w(TAG, "source.register() fehlgeschlagen: ${e.message} — nur 30s-Safety-Intervall aktiv", e)
         }
+        Log.d(TAG, "started — initial probe")
         onNetworkChange() // Initial-Probe
     }
 
@@ -89,7 +99,12 @@ class NetworkWatchdog(
         pending?.cancel()
         pending = scope.launch {
             delay(debounceMs)
+            Log.d(TAG, "debounced probe fired")
             cb()
         }
+    }
+
+    companion object {
+        private const val TAG = "NetworkWatchdog"
     }
 }

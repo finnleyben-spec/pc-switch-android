@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import android.util.Log
 import androidx.annotation.RequiresApi
 import dev.finnley.pcswitch.R
 
@@ -24,6 +25,7 @@ class QuickSettingsTileService : TileService() {
         private const val PREFS_NAME = "pcswitch_tile"
         private const val KEY_IS_ON = "tile_is_on"
         private const val KEY_SWITCH_NAME = "tile_switch_name"
+        private const val TAG = "QS-Tile"
     }
 
     private var isOn = false
@@ -65,6 +67,7 @@ class QuickSettingsTileService : TileService() {
     override fun onClick() {
         super.onClick()
 
+        Log.i(TAG, "tile clicked: $currentSwitchName ${if (isOn) "OFF" else "ON"}")
         // Use deep link to trigger toggle — works even when app is not running
         val deepLink = Intent(Intent.ACTION_VIEW, Uri.parse("pcswitch://trigger?press=toggle"))
         deepLink.setPackage(packageName)
