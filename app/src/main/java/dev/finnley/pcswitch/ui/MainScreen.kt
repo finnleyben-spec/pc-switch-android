@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -104,6 +105,7 @@ fun MainScreen(
         Modifier
             .fillMaxSize()
             .background(Bg)
+            .systemBarsPadding() // B1: Edge-to-Edge — Inhalt unter Status-/Nav-Bar
     ) {
         // Loading indicator
         if (state.loading) {

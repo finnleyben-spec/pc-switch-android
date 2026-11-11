@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -109,6 +110,7 @@ fun SwitchesScreen(
             .fillMaxSize()
             .background(Bg)
             .verticalScroll(rememberScrollState())
+            .systemBarsPadding() // B1: Edge-to-Edge — Header-Buttons müssen unter der Status-Bar liegen
             .padding(24.dp)
     ) {
         // Header
