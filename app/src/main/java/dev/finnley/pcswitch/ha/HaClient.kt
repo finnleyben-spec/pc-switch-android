@@ -1,5 +1,6 @@
 package dev.finnley.pcswitch.ha
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -10,6 +11,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -19,6 +21,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Home Assistant-Zugriff — gleiches Flat-Protokoll wie die PWA:
@@ -78,40 +81,54 @@ object HaClient {
         .build()
 
     /**
-     * Eine lebende HA-Verbindung: Auth, State-Subscribe, Watchdog (get_states alle 20s),
-     * Auto-Reconnect nach 2.5s. [entityStates] hält die States der [entities].
+     * Eine lebende HA-Verbindung: Auth, State-Subscribe, Watchdog (get_states),
+     * Auto-Reconnect mit exponentiellem Backoff (1s→30s, [ReconnectBackoff]).
+     * [entityStates] hält die States der [entities].
+     *
+     * Testbarkeit: [factory] (WebSocket-Factory), [scope], [clock] und [backoff]
+     * sind injizierbar (Defaults = Produktverhalten); Public-API bleibt signaturstabil.
      */
     class HaSession(
         base: String,
         secureDefault: Boolean,
         private val token: String,
         private val entities: Set<String>,
+        factory: WebSocket.Factory = defaultWebSocketClient(),
+        scope: CoroutineScope? = null,
+        private val clock: () -> Long = { System.currentTimeMillis() },
+        backoff: ReconnectBackoff = ReconnectBackoff(),
     ) {
         val entityStates = MutableStateFlow<Map<String, String>>(emptyMap())
         val alive = MutableStateFlow(false)
         val lastUpdate = MutableStateFlow(0L)
         val authFailed = MutableStateFlow(false)
+        /** Zeitpunkt des letzten Entity-Events/State-Sync (Drift-Watchdog, R11). */
+        @Volatile
+        var lastEntityEventAt: Long = 0L
+            private set
 
         private val url: String? = wsUrl(base, secureDefault)
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        private val client = OkHttpClient.Builder()
-            .connectTimeout(4, TimeUnit.SECONDS)
-            .readTimeout(0, TimeUnit.SECONDS)
-            .pingInterval(15, TimeUnit.SECONDS)
-            .build()
+        private val factory: WebSocket.Factory = factory
+        private val ownsScope = scope == null
+        private val scope: CoroutineScope =
+            scope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val backoff: ReconnectBackoff = backoff
 
+        @Volatile
         private var ws: WebSocket? = null
-        private var reqId = 0
+        private val reqId = AtomicInteger(0)
         private val pending = ConcurrentHashMap<Int, (JSONObject) -> Unit>()
+        @Volatile
         private var authed = false
         private var reconnectJob: Job? = null
         private var watchdogJob: Job? = null
+        @Volatile
         private var stopped = false
 
         fun start() {
             val u = url ?: return
             stopped = false
-            ws = client.newWebSocket(
+            ws = factory.newWebSocket(
                 Request.Builder().url(u).build(),
                 object : WebSocketListener() {
                     override fun onOpen(w: WebSocket, response: Response) {
@@ -123,12 +140,12 @@ object HaClient {
 
                     override fun onFailure(w: WebSocket, t: Throwable, response: Response?) {
                         alive.value = false
-                        scheduleReconnect()
+                        if (!authFailed.value) scheduleReconnect()
                     }
 
                     override fun onClosed(w: WebSocket, code: Int, reason: String) {
                         alive.value = false
-                        scheduleReconnect()
+                        if (!authFailed.value) scheduleReconnect()
                     }
                 }
             )
@@ -140,7 +157,7 @@ object HaClient {
             reconnectJob?.cancel()
             ws?.cancel()
             ws = null
-            scope.cancel()
+            if (ownsScope) scope.cancel()
         }
 
         /** call_service: button.press, light.turn_on/off, switch.turn_on/off (Domain aus Entity ableiten). */
@@ -154,7 +171,7 @@ object HaClient {
                 else -> "press"
             }
             val o = JSONObject()
-                .put("id", ++reqId)
+                .put("id", reqId.incrementAndGet())
                 .put("type", "call_service")
                 .put("domain", domain)
                 .put("service", service)
@@ -163,11 +180,11 @@ object HaClient {
         }
 
         private fun scheduleReconnect() {
-            if (stopped || reconnectJob?.isActive == true) return
+            if (stopped || authFailed.value || reconnectJob?.isActive == true) return
             reconnectJob = scope.launch {
-                delay(2500)
+                delay(backoff.nextDelayMs())
                 reconnectJob = null
-                if (stopped) return@launch
+                if (stopped || authFailed.value) return@launch
                 ws?.cancel()
                 start()
             }
@@ -184,10 +201,11 @@ object HaClient {
                     authed = true
                     authFailed.value = false
                     alive.value = true
+                    backoff.reset()
                     getStates { applyStates(it.optJSONArray("result")) }
                     w.send(
                         JSONObject()
-                            .put("id", ++reqId)
+                            .put("id", reqId.incrementAndGet())
                             .put("type", "subscribe_events")
                             .put("event_type", "state_changed")
                             .toString()
@@ -214,27 +232,44 @@ object HaClient {
                         val ns = ev.optJSONObject("new_state")
                         entityStates.value =
                             entityStates.value + (entity to (ns?.optString("state") ?: "unknown"))
-                        lastUpdate.value = System.currentTimeMillis()
+                        lastEntityEventAt = clock()
+                        lastUpdate.value = clock()
                     }
                 }
             }
         }
 
         private fun getStates(cb: (JSONObject) -> Unit) {
-            val id = ++reqId
-            pending[id] = cb
-            ws?.send(JSONObject().put("id", id).put("type", "get_states").toString())
+            sendRequest("get_states", cb)
+        }
+
+        /**
+         * Request-Antwort über Channel mit hartem 8s-Timeout (R10):
+         * antwortet der Server nicht, wird der Callback NICHT aufgerufen
+         * (kein hängender receive(), kein loading=true-Deadlock).
+         */
+        private fun sendRequest(type: String, cb: (JSONObject) -> Unit) {
+            val id = reqId.incrementAndGet()
+            val ch = Channel<JSONObject>(1)
+            pending[id] = { o -> ch.trySend(o) }
+            ws?.send(JSONObject().put("id", id).put("type", type).toString())
             scope.launch {
-                delay(6000)
+                val o = try {
+                    withTimeout(8_000) { ch.receive() }
+                } catch (e: CancellationException) {
+                    pending.remove(id)  // Timeout oder Scope-Stop: kein Callback
+                    return@launch
+                }
                 pending.remove(id)
+                cb(o)
             }
         }
 
-        /** Fetch all entity IDs from HA via get_entity_ids command. */
+        /** Fetch all entity IDs from HA via get_entity_ids command (8s-Timeout, R10). */
         suspend fun getEntityIds(): List<String> {
             return withContext(Dispatchers.IO) {
                 val channel = Channel<List<String>>(1)
-                val id = ++reqId
+                val id = reqId.incrementAndGet()
                 pending[id] = { o ->
                     val arr = o.optJSONArray("result")
                     if (arr != null) {
@@ -248,15 +283,20 @@ object HaClient {
                     }
                 }
                 ws?.send(JSONObject().put("id", id).put("type", "get_entity_ids").toString())
-                channel.receive()
+                try {
+                    withTimeout(8_000) { channel.receive() }
+                } catch (e: CancellationException) {
+                    pending.remove(id)
+                    emptyList()
+                }
             }
         }
 
-        /** Fetch all entity states (with friendly names from attributes). */
+        /** Fetch all entity states (with friendly names from attributes, 8s-Timeout, R10). */
         suspend fun getEntityStates(): List<EntityState> {
             return withContext(Dispatchers.IO) {
                 val channel = Channel<List<EntityState>>(1)
-                val id = ++reqId
+                val id = reqId.incrementAndGet()
                 pending[id] = { o ->
                     val arr = o.optJSONArray("result")
                     if (arr != null) {
@@ -273,7 +313,12 @@ object HaClient {
                     }
                 }
                 ws?.send(JSONObject().put("id", id).put("type", "get_states").toString())
-                channel.receive()
+                try {
+                    withTimeout(8_000) { channel.receive() }
+                } catch (e: CancellationException) {
+                    pending.remove(id)
+                    emptyList()
+                }
             }
         }
 
@@ -294,7 +339,8 @@ object HaClient {
                 if (e in entities) m[e] = s.optString("state")
             }
             entityStates.value = m
-            lastUpdate.value = System.currentTimeMillis()
+            lastEntityEventAt = clock()
+            lastUpdate.value = clock()
         }
     }
 
@@ -305,3 +351,10 @@ object HaClient {
         val friendlyName: String
     )
 }
+
+/** Default-WebSocket-Factory für [HaClient.HaSession] (OkHttpClient implementiert [okhttp3.WebSocket.Factory]). */
+private fun defaultWebSocketClient(): WebSocket.Factory = OkHttpClient.Builder()
+    .connectTimeout(4, TimeUnit.SECONDS)
+    .readTimeout(0, TimeUnit.SECONDS)
+    .pingInterval(15, TimeUnit.SECONDS)
+    .build()
