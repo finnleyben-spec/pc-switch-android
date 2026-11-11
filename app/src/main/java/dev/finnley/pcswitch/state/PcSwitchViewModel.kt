@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,6 +20,7 @@ import dev.finnley.pcswitch.state.SwitchManager
 import dev.finnley.pcswitch.state.SwitchConfig
 import dev.finnley.pcswitch.update.UpdateManager
 import dev.finnley.pcswitch.vpn.VpnController
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 sealed class Mode {
     data object HomeLan : Mode()
@@ -169,15 +172,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         // Load switches and observe changes — start sessions after switches load
-        viewModelScope.launch {
-            switchManager.switchesFlow().collect { switches ->
-                _state.update { st ->
-                    st.copy(switches = switches)
-                }
-                // Start/restart sessions whenever switches change so entity subscriptions are correct
-                startSessions()
-            }
-        }
+        observeSwitches()
         // Check for updates on startup
         viewModelScope.launch {
             delay(2000) // Wait a bit after startup
@@ -334,10 +329,18 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         } else {
-            if (switch.type == "dual" && switch.secondaryEntity.isNotBlank()) {
-                press(switch.secondaryEntity)
+            if (switch.type == "dual") {
+                if (switch.secondaryEntity.isNotBlank()) {
+                    press(switch.secondaryEntity)
+                } else {
+                    // B4: Ohne OFF-Entity früher: primary (ON!) wird erneut gedrückt —
+                    // stiller Fehltrigger. Jetzt: Action überspringen + Hinweis.
+                    Log.w(TAG, "OFF for \"${switch.name}\": no OFF entity configured — action skipped")
+                    Toast.makeText(ctx, "Kein OFF-Entity hinterlegt", Toast.LENGTH_SHORT).show()
+                    return
+                }
             } else {
-                press(switch.primaryEntity)  // toggle behavior
+                press(switch.primaryEntity)
             }
             _state.update {
                 it.copy(
@@ -350,9 +353,14 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun press(entity: String) {
-        val s = activeSession() ?: return
-        if (!s.alive.value) return
-        s.press(entity)
+        if (entity.isBlank()) return
+        val s = activeSession()
+        if (s == null || !s.alive.value) {
+            Log.w(TAG, "press($entity): no active HA session — skipped")
+            return
+        }
+        val ok = s.press(entity)
+        if (!ok) Log.w(TAG, "press($entity): WebSocket send failed")
     }
 
     /** Boot PC flow: send WoL, wait for reachable, or timeout at 60s. */
@@ -491,15 +499,54 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- Switch Management ----------
 
-    fun addSwitch(name: String, type: String, primaryEntity: String, secondaryEntity: String) {
+    fun addSwitch(name: String, type: String, primaryEntity: String, secondaryEntity: String, stateEntity: String = "") {
         viewModelScope.launch {
-            switchManager.addSwitch(name, type, primaryEntity, secondaryEntity)
+            switchManager.addSwitch(name, type, primaryEntity, secondaryEntity, stateEntity)
         }
     }
 
     fun updateSwitch(switchConfig: SwitchConfig) {
         viewModelScope.launch {
             switchManager.updateSwitch(switchConfig)
+        }
+    }
+
+    /**
+     * Beobachtet die Switch-Config aus dem DataStore.
+     *
+     * B7: Korrupte/lesbar-unmöglche `switches.preferences_pb` (z.B. durch
+     * externe Manipulation oder abgebrochenen Write) warf bisher eine
+     * Exception im Collector und crash-te die App. Jetzt: Datei zurücksetzen
+     * und einmal neu beobachten.
+     */
+    private fun observeSwitches() {
+        viewModelScope.launch {
+            try {
+                switchManager.switchesFlow().collect { switches ->
+                    _state.update { st ->
+                        st.copy(switches = switches)
+                    }
+                    // Start/restart sessions whenever switches change so entity subscriptions are correct
+                    startSessions()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Switch-DataStore unreadable (${e::class.simpleName}: ${e.message}) — resetting and retrying", e)
+                resetCorruptSwitchStore()
+                observeSwitches()
+            }
+        }
+    }
+
+    /** Löscht die (potenziell korrupten) DataStore-Dateien; DataStore legt sie neu an. */
+    private fun resetCorruptSwitchStore() {
+        listOf("switches.preferences_pb", "switches.preferences_pb-wal").forEach { name ->
+            try {
+                File(ctx.filesDir, "datastore/$name").delete()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not delete datastore file $name: ${e.message}")
+            }
         }
     }
 
@@ -948,6 +995,8 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
+        private const val TAG = "PcSwitchViewModel"
+
         /** Heartbeat-Intervall: identische Snapshots werden trotzdem 1x/30s
          *  emittiert, damit lastUpdate frisch bleibt (R5). */
         const val HEARTBEAT_MS = 30_000L

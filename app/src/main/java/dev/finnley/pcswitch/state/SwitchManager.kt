@@ -36,10 +36,10 @@ class SwitchManager(private val context: Context) {
     }
 
     /** Add a new switch. Returns its id. */
-    suspend fun addSwitch(name: String, type: String, primaryEntity: String, secondaryEntity: String = ""): String {
+    suspend fun addSwitch(name: String, type: String, primaryEntity: String, secondaryEntity: String = "", stateEntity: String = ""): String {
         val switches = getSwitches().toMutableList()
         val id = "switch_${System.currentTimeMillis()}"
-        switches.add(SwitchConfig.newSwitch(id, name, type, primaryEntity, secondaryEntity))
+        switches.add(SwitchConfig.newSwitch(id, name, type, primaryEntity, secondaryEntity, stateEntity))
         saveSwitches(switches)
         return id
     }

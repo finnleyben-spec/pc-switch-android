@@ -16,8 +16,8 @@ data class SwitchConfig(
     var stateEntity: String = ""  // optional entity that reflects on/off state
 ) {
     companion object {
-        fun newSwitch(id: String, name: String, type: String, primaryEntity: String, secondaryEntity: String = ""): SwitchConfig {
-            return SwitchConfig(id, name, type, primaryEntity, secondaryEntity)
+        fun newSwitch(id: String, name: String, type: String, primaryEntity: String, secondaryEntity: String = "", stateEntity: String = ""): SwitchConfig {
+            return SwitchConfig(id, name, type, primaryEntity, secondaryEntity, stateEntity)
         }
     }
 }
