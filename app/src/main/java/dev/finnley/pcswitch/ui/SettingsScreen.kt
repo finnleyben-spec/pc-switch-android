@@ -215,7 +215,7 @@ fun SettingsScreen(
                 GothicOutlinedTextField(
                     value = editedLan,
                     onValueChange = { editedLan = it },
-                    label = { Text("LAN Base") },
+                    label = { Text("LAN-Adresse") },
                     placeholder = { Text("z. B. homeassistant.local:8123") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -225,7 +225,7 @@ fun SettingsScreen(
                 GothicOutlinedTextField(
                     value = editedRelay,
                     onValueChange = { editedRelay = it },
-                    label = { Text("Relay Base") },
+                    label = { Text("Relay-Adresse") },
                     placeholder = { Text("z. B. mein-rechner.ts.net") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -461,6 +461,32 @@ fun SettingsScreen(
                 Text(
                     "Backup und Wiederherstellung der App-Einstellungen.",
                     fontSize = 12.sp,
+                    color = InkSoft
+                )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("Über die App")
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "PC Switch — starte deinen PC aus der Ferne über Home Assistant.",
+                    fontSize = 14.sp,
+                    color = Ink
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    fontSize = 13.sp,
+                    color = InkSoft
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Open Source unter GNU GPL v3 (siehe LICENSE). " +
+                        "Kein Tracking, keine Telemetrie.",
+                    fontSize = 13.sp,
                     color = InkSoft
                 )
             }

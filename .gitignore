@@ -4,3 +4,12 @@ app/build/
 local.properties
 *.iml
 .idea/
+
+# Signierungs-Material niemals ins Repo
+*.keystore
+*.jks
+keystore.properties
+
+# OS/Editor
+.DS_Store
+*.log

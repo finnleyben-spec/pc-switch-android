@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,19 +14,31 @@ android {
         applicationId = "dev.finnley.pcswitch"
         minSdk = 26
         targetSdk = 36
-        versionCode = 77
-        versionName = "2.10.0"
+        versionCode = 78
+        versionName = "3.0.0-alpha.1"
     }
 
-    // Release signing config
+    // Release-Signing: Credentials bleiben lokal in keystore.properties
+    // (gitignored, siehe keystore.properties.example). Ohne lokale Keystore-
+    // Dateien wird Release mit Debug-Signing gebaut (z. B. für Play-Upload,
+    // wo Play App Signing signiert).
+    val keystorePropsFile = rootDir.resolve("keystore.properties")
+    val keystoreConf: Properties? = if (keystorePropsFile.exists()) {
+        Properties().apply { keystorePropsFile.inputStream().use { load(it) } }
+    } else null
+    val keystoreFile = keystoreConf?.getProperty("KEYSTORE_FILE")?.let { rootDir.resolve(it) }
+        ?: rootDir.resolve("pcswitch-release.keystore")
+    val hasKeystore = keystoreFile.exists() &&
+        !keystoreConf?.getProperty("KEYSTORE_PASSWORD").isNullOrBlank()
+
     signingConfigs {
         create("release") {
-            val keystoreFile = rootDir.resolve("pcswitch-release.keystore")
-            if (keystoreFile.exists()) {
+            if (hasKeystore) {
+                val p = keystoreConf!!
                 storeFile = keystoreFile
-                storePassword = "pcswitch2026"
-                keyAlias = "pcswitch"
-                keyPassword = "pcswitch2026"
+                storePassword = p.getProperty("KEYSTORE_PASSWORD").orEmpty()
+                keyAlias = p.getProperty("KEY_ALIAS") ?: "pcswitch"
+                keyPassword = p.getProperty("KEY_PASSWORD") ?: p.getProperty("KEYSTORE_PASSWORD").orEmpty()
             }
         }
     }
@@ -37,7 +51,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            if (hasKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     testOptions {
@@ -76,6 +92,8 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     // HA-WebSocket + Update-Download
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // mDNS-Discovery für Home-Assistant (reine Java-Lib, ~100 KB)
+    implementation("javax.jmdns:jmdns:3.4.1")
     // DataStore für Switch-Konfiguration
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.datastore:datastore:1.1.1")
