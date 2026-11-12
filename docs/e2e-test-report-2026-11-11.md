@@ -86,6 +86,14 @@ Timestamp sichtbar**, Liste zeigt nur Name / Entity / Badge. Vermutlich
 Zustandsabhängig oder bereits gefixt (S10: relativeTime). → Als offen stehen
 lassen, falls es auf einem echten Gerät noch auftritt.
 
+**Status 2026-11-12: GEFIXT.** Root Cause: `input_button`-Entities ohne
+`stateEntity` liefern als State eine rohe ISO-Timestamp → `switchStateLabel`
+zeigte sie im Status-Label (Repro: TestB4, uiautomator-Dump „Unbekannt"
+vorher unsichtbar, Label zeigte Timestamp). Fix Commit `6561156`:
+`buildSnapshot` normalisiert jeden State ≠ on/off zu `unknown`
+(„Unbekannt"). +2 Unit-Tests. Device-Re-Check mit neuem APK ausstehend
+(siehe `e2e-open-items-2026-11-12.md`, Punkt 2).
+
 ### B4 — State-Sync-Lücke ~15 s: OFF-Action kurz nach ON schlägt fehl (mittel)
 
 **Symptom:** Slider nach rechts (ON) triggert den Primary-Button, HA-State
@@ -100,6 +108,17 @@ schnelles An-Aus könnte nicht triggern.
 
 **Fix-Idee:** State-Optimistic-Update oder direct WS-State-Priorität bei
 Actions.
+
+**Status 2026-11-12: ROOT CAUSE KORRIGIERT + CODE-FIX FERTIG.** Der Verdacht
+(lokaler State-Hinterherschlurf) war falsch — Logcat-Nachweis: Beim State-Flip
+(optimistic/WS) schrieb `LaunchedEffect(isOn)` per Spring in `animProgress` und
+übersteuerte den laufenden OFF-Drag (~400 ms); das Crossing wurde vom
+manipulierten animierten Wert entschieden und fiel hinter den Drag-Ende.
+Zusätzlich restartete der `pointerInput`-Key `isOn` den Detektor mid-Drag.
+Fix Commit `29011a7`: fingerbasierte Crossing-Entscheidung, `isOn` als
+State-Holder (kein Key), `isDragging` stoppt die Sync-Animation.
+Device-Verifikation (ON→OFF bei 0.2 s Pause) ausstehend —
+`e2e-open-items-2026-11-12.md`, Punkt 1.
 
 ### B5 — Löschen ohne Bestätigung (niedrig, UX)
 
