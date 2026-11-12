@@ -20,7 +20,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +37,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 
 /**
  * Gothic cyber toggle with detent resistance and neon glow.
@@ -53,7 +51,6 @@ fun EntityToggle(
     modifier: Modifier = Modifier
 ) {
     val view = LocalView.current
-    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val anim = remember { Animatable(if (isOn) 1f else 0f) }
     var animProgress by remember { mutableStateOf(anim.value) }
@@ -85,8 +82,18 @@ fun EntityToggle(
         0f
     }
 
-    // Sync animation with state
-    LaunchedEffect(isOn) {
+    // B4: isOn is read through a state holder inside the gesture, so a state
+    // flip mid-drag (optimistic press / WS push) does NOT restart the gesture
+    // detector — a restart would cancel the in-progress drag.
+    val isOnState = remember { mutableStateOf(isOn) }
+    LaunchedEffect(isOn) { isOnState.value = isOn }
+    var isDragging by remember { mutableStateOf(false) }
+
+    // Sync animation with state — but while the user is dragging, the finger
+    // owns the knob: the effect is cancelled on drag start, so its spring can
+    // no longer overwrite the drag progress (root cause of the B4 ON->OFF bug).
+    LaunchedEffect(isOn, isDragging) {
+        if (isDragging) return@LaunchedEffect
         anim.snapTo(animProgress)
         anim.animateTo(
             targetValue = if (isOn) 1f else 0f,
@@ -144,67 +151,56 @@ fun EntityToggle(
                 if (w > 0f && toggleWidth != w.dp) {
                     toggleWidth = w.dp
                 }
+                android.util.Log.d("PcSwitchDebug",
+                    "EntityToggle BOUNDS rootPos=${coords.localToRoot(androidx.compose.ui.geometry.Offset.Zero)} size=${coords.size} isOn=$isOn")
             }
-            .pointerInput(enabled, toggleWidth, isOn, transitioning) {
+            .pointerInput(enabled, toggleWidth, transitioning) {
                 if (enabled && !transitioning) {
                     val travel = density.run {
                         (toggleWidth.value - 60f).dp.toPx()
                     }.coerceAtLeast(10f)
 
+                    // B4: crossing is decided from the FINGER position relative to
+                    // the drag start, never from the animated knob value. The knob
+                    // can lag or be disturbed by state-sync animations; the press
+                    // must still register in rapid ON->OFF sequences.
+                    var dragBase = 0f
+                    var dragStartX = 0f
+
                     detectDragGestures(
-                        onDragStart = {
+                        onDragStart = { pos ->
                             hasSwitched = false
+                            isDragging = true
+                            dragBase = if (isOnState.value) 1f else 0f
+                            dragStartX = pos.x
+                            android.util.Log.d("PcSwitchDebug",
+                                "EntityToggle onDragStart enabled=$enabled transitioning=$transitioning isOn=${isOnState.value} dragBase=$dragBase startX=${pos.x} travel=$travel")
                         },
-                        onDrag = { change, dragAmount ->
+                        onDrag = { change, _ ->
                             change.consume()
                             if (hasSwitched) return@detectDragGestures
+                            val fingerP = dragBase + (change.position.x - dragStartX) / travel
+                            android.util.Log.d("PcSwitchDebug",
+                                "EntityToggle onDrag fingerP=$fingerP dragBase=$dragBase")
 
-                            val detentFactor = if (animProgress in 0.45f..0.55f) {
-                                0.25f
-                            } else if (animProgress in 0.35f..0.45f || animProgress in 0.55f..0.65f) {
-                                0.5f
-                            } else {
-                                1.0f
-                            }
+                            // Visual: knob follows the finger directly.
+                            animProgress = fingerP.coerceIn(0f, 1f)
 
-                            val delta = (dragAmount.x / travel) * detentFactor
-                            animProgress = (animProgress + delta).coerceIn(0f, 1f)
-
-                            val crossed = if (isOn) {
-                                animProgress < 0.5f
-                            } else {
-                                animProgress > 0.5f
-                            }
-
-                            if (crossed && !hasSwitched) {
+                            val crossedOn = dragBase < 0.5f && fingerP >= 0.5f
+                            val crossedOff = dragBase > 0.5f && fingerP <= 0.5f
+                            if ((crossedOn || crossedOff) && !hasSwitched) {
                                 hasSwitched = true
                                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                onToggle(!isOn)
+                                onToggle(crossedOn)
                             }
                         },
                         onDragEnd = {
-                            if (!hasSwitched) {
-                                scope.launch {
-                                    anim.animateTo(
-                                        targetValue = if (isOn) 1f else 0f,
-                                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f)
-                                    ) {
-                                        animProgress = value
-                                    }
-                                }
-                            }
+                            // Release: LaunchedEffect(isOn, isDragging) re-syncs the
+                            // knob to the (possibly updated) logical state.
+                            isDragging = false
                         },
                         onDragCancel = {
-                            if (!hasSwitched) {
-                                scope.launch {
-                                    anim.animateTo(
-                                        targetValue = if (isOn) 1f else 0f,
-                                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f)
-                                    ) {
-                                        animProgress = value
-                                    }
-                                }
-                            }
+                            isDragging = false
                         }
                     )
                 }
