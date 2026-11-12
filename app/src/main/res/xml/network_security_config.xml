@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- v3.0 (Public Release): keine personalen Certs/Domains mehr.
-     HA muss über HTTPS erreichbar sein (Domain, Tailscale-Host oder
-     eigene CA, die in den Systemeinstellungen des Geräts installiert ist). -->
+     TLS-Verbindungen vertrauen nur den System-CA (selbstsignierte Server-Zertifikate
+     müssen vom Nutzer in den Systemeinstellungen des Geräts installiert werden).
+     Cleartext-HTTP wird nur über die Manifest-Erlaubnis für LAN-Ziele möglich
+     (öffentliche Hosts über HTTP blockiert die UI). -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

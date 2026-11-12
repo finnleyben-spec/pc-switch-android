@@ -48,6 +48,33 @@ object HaClient {
         }
     }
 
+    /**
+     * REST-Check des Long-Lived-Tokens gegen <base>/api/ (Bearer-Header).
+     * 2xx = gültig, 401/403 = ungültig, sonst (auch Timeout/Cert-Fehler) = unerreichbar.
+     */
+    enum class TokenCheck { VALID, INVALID_TOKEN, UNREACHABLE }
+
+    fun classifyTokenCode(code: Int): TokenCheck = when {
+        code in 200..299 -> TokenCheck.VALID
+        code == 401 || code == 403 -> TokenCheck.INVALID_TOKEN
+        else -> TokenCheck.UNREACHABLE
+    }
+
+    fun checkToken(base: String, token: String, secureDefault: Boolean): TokenCheck {
+        if (token.isBlank()) return TokenCheck.UNREACHABLE
+        val url = httpBase(base, secureDefault) ?: return TokenCheck.UNREACHABLE
+        val req = Request.Builder()
+            .url(url.trimEnd('/') + "/api/")
+            .header("Authorization", "Bearer $token")
+            .build()
+        return try {
+            sharedClient.newCall(req).execute().use { r -> classifyTokenCode(r.code) }
+        } catch (e: Exception) {
+            Log.w(TAG, "checkToken: ${e.message}")
+            TokenCheck.UNREACHABLE
+        }
+    }
+
     /** Base ("host[:port]" oder http(s)://) → normale http(s)-URL. */
     fun httpBase(base: String, secureDefault: Boolean): String? {
         val b = base.trim()
@@ -59,7 +86,8 @@ object HaClient {
             else -> (if (secureDefault) "https://" else "http://") + b
         }
         return try {
-            java.net.URI(s).let { s }
+            val u = java.net.URI(s)
+            if (u.host.isNullOrEmpty()) null else s
         } catch (e: Exception) {
             null
         }
