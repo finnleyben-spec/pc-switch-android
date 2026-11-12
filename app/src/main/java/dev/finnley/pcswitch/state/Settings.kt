@@ -2,9 +2,10 @@ package dev.finnley.pcswitch.state
 
 import android.content.Context
 
-/** Geräte-Einstellungen (SharedPreferences). Defaults = bekannte Heim-Endpunkte. */
+/** Geräte-Einstellungen (SharedPreferences). Token wird verschlüsselt gespeichert (security audit). */
 class Settings(context: Context) {
     private val p = context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    private val secure = SecureSettings(context)
 
     var lanBase: String
         get() = p.getString(K_LAN, DEF_LAN) ?: DEF_LAN
@@ -14,9 +15,10 @@ class Settings(context: Context) {
         get() = p.getString(K_RELAY, DEF_RELAY) ?: DEF_RELAY
         set(v) { p.edit().putString(K_RELAY, v.trim()).apply() }
 
+    /** HA-Access-Token, verschlüsselt in EncryptedSharedPreferences gespeichert. */
     var token: String
-        get() = p.getString(K_TOKEN, "") ?: ""
-        set(v) { p.edit().putString(K_TOKEN, v.trim()).apply() }
+        get() = secure.getToken()
+        set(v) { secure.setToken(v) }
 
     var onEntity: String
         get() = p.getString(K_ON, DEF_ON) ?: DEF_ON

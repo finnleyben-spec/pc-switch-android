@@ -67,7 +67,9 @@ fun SettingsScreen(
     onCheckUpdate: () -> Unit,
     onDownloadUpdate: () -> Unit,
     onRetryDownload: () -> Unit,
-    onRollback: () -> Unit
+    onRollback: () -> Unit,
+    onExportSettings: () -> Unit,
+    onImportSettings: () -> Unit
 ) {
     var showChangelog by remember { mutableStateOf(false) }
     var editedLan by remember { mutableStateOf(lanBase) }
@@ -434,6 +436,33 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("Backup")
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onExportSettings,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Einstellungen exportieren")
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onImportSettings,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Einstellungen importieren")
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Backup und Wiederherstellung der App-Einstellungen.",
+                    fontSize = 12.sp,
+                    color = InkSoft
+                )
             }
         }
     }

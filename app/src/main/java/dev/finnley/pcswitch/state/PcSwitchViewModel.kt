@@ -893,6 +893,16 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         return updater.hasPreviousVersion()
     }
 
+    // ---------- Settings Export/Import ----------
+
+    fun exportSettings(): String {
+        return dev.finnley.pcswitch.settings.SettingsExporter.export(ctx)
+    }
+
+    fun importSettings(json: String): Boolean {
+        return dev.finnley.pcswitch.settings.SettingsExporter.importSettings(ctx, json)
+    }
+
     // ---------- Probing + Sessions ----------
 
     private fun activeSession(): HaSession? =

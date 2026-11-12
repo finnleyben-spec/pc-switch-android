@@ -67,7 +67,14 @@ fun PcSwitchApp(vm: PcSwitchViewModel) {
                     onCheckUpdate = vm::checkForUpdate,
                     onDownloadUpdate = vm::downloadUpdate,
                     onRetryDownload = vm::retryDownload,
-                    onRollback = vm::rollback
+                    onRollback = vm::rollback,
+                    onExportSettings = {
+                        val exported = vm.exportSettings()
+                        // Show export dialog or save to file
+                    },
+                    onImportSettings = {
+                        // Show import dialog
+                    }
                 )
             }
 
