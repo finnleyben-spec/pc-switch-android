@@ -398,7 +398,7 @@ private fun SwitchDialog(
                                 value = primaryEntity,
                                 onValueChange = { primaryEntity = it },
                                 label = { Text("Primary Entity") },
-                                placeholder = { Text("button.buro_wake_pc") },
+                                placeholder = { Text("button.turn_on_my_pc") },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -421,7 +421,7 @@ private fun SwitchDialog(
                                     value = secondaryEntity,
                                     onValueChange = { secondaryEntity = it },
                                     label = { Text("Secondary Entity (Off)") },
-                                    placeholder = { Text("input_button.pc_aus") },
+                                    placeholder = { Text("input_button.turn_off_my_pc") },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -444,7 +444,7 @@ private fun SwitchDialog(
                                 value = stateEntity,
                                 onValueChange = { stateEntity = it },
                                 label = { Text("State Entity (optional)") },
-                                placeholder = { Text("switch.buro_pc") },
+                                placeholder = { Text("switch.my_pc") },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )

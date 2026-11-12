@@ -70,11 +70,13 @@ class Settings(context: Context) {
         private const val K_NOTIFICATION_ENABLED = "notification_enabled"
         private const val K_NOTIFICATION_MODE = "notification_mode"
         private const val K_NOTIFICATION_PC_NAME = "notification_pc_name"
-        const val DEF_LAN = "192.168.0.205:8123"
-        const val DEF_RELAY = "100.106.82.86"
-        const val DEF_ON = "button.buro_wake_pc_buro"
-        const val DEF_OFF = "input_button.pc_ausschalten"
-        const val DEF_PC_IP = "192.168.0.57"
+        // v3.0 (Public Release): keine personalen Defaults mehr — alles leer,
+        // wird im Setup/Settings vom Nutzer konfiguriert.
+        const val DEF_LAN = ""
+        const val DEF_RELAY = ""
+        const val DEF_ON = ""
+        const val DEF_OFF = ""
+        const val DEF_PC_IP = ""
         const val DEF_PC_NAME = "PC"
     }
 }

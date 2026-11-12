@@ -189,7 +189,7 @@ fun SettingsScreen(
                     value = editedOnEntity,
                     onValueChange = { editedOnEntity = it },
                     label = { Text("On Entity ID") },
-                    placeholder = { Text("button.buro_wake_pc_buro") },
+                    placeholder = { Text("button.turn_on_my_pc") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -199,7 +199,7 @@ fun SettingsScreen(
                     value = editedOffEntity,
                     onValueChange = { editedOffEntity = it },
                     label = { Text("Off Entity ID") },
-                    placeholder = { Text("input_button.pc_ausschalten") },
+                    placeholder = { Text("input_button.turn_off_my_pc") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -216,7 +216,7 @@ fun SettingsScreen(
                     value = editedLan,
                     onValueChange = { editedLan = it },
                     label = { Text("LAN Base") },
-                    placeholder = { Text("z. B. 192.168.0.205:8123") },
+                    placeholder = { Text("z. B. homeassistant.local:8123") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -226,7 +226,7 @@ fun SettingsScreen(
                     value = editedRelay,
                     onValueChange = { editedRelay = it },
                     label = { Text("Relay Base") },
-                    placeholder = { Text("z. B. 100.106.82.86") },
+                    placeholder = { Text("z. B. mein-rechner.ts.net") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -259,7 +259,7 @@ fun SettingsScreen(
                     value = editedPcIp,
                     onValueChange = { editedPcIp = it },
                     label = { Text("PC IP-Adresse") },
-                    placeholder = { Text("192.168.0.57") },
+                    placeholder = { Text("z. B. 192.168.1.50") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

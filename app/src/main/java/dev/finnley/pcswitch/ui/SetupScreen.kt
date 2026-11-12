@@ -107,7 +107,7 @@ fun SetupScreen(
                     value = onEntity,
                     onValueChange = { onEntity = it },
                     label = { Text("On Entity ID") },
-                    placeholder = { Text("button.buro_wake_pc_buro") },
+                    placeholder = { Text("button.turn_on_my_pc") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -123,7 +123,7 @@ fun SetupScreen(
                     value = offEntity,
                     onValueChange = { offEntity = it },
                     label = { Text("Off Entity ID") },
-                    placeholder = { Text("input_button.pc_ausschalten") },
+                    placeholder = { Text("input_button.turn_off_my_pc") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -146,13 +146,13 @@ fun SetupScreen(
                     value = lan,
                     onValueChange = { lan = it },
                     label = { Text("LAN Base") },
-                    placeholder = { Text("z. B. 192.168.0.205:8123") },
+                    placeholder = { Text("z. B. homeassistant.local:8123") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "IP und Port deines Home Assistant Servers, z. B. 192.168.0.205:8123",
+                    "Host/IP und Port deines Home Assistant Servers, z. B. homeassistant.local:8123",
                     fontSize = 12.sp,
                     color = InkSoft
                 )
@@ -162,13 +162,13 @@ fun SetupScreen(
                     value = relay,
                     onValueChange = { relay = it },
                     label = { Text("Relay Base") },
-                    placeholder = { Text("z. B. 100.106.82.86") },
+                    placeholder = { Text("z. B. mein-rechner.ts.net") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "IP deines Relay Servers, z. B. 100.106.82.86",
+                    "Host/IP deines Relay Servers (z. B. Tailscale-Adresse), optional für Remote-Zugang",
                     fontSize = 12.sp,
                     color = InkSoft
                 )
@@ -208,7 +208,7 @@ fun SetupScreen(
                     value = pcIp,
                     onValueChange = { pcIp = it },
                     label = { Text("PC IP-Adresse") },
-                    placeholder = { Text("192.168.0.57") },
+                    placeholder = { Text("z. B. 192.168.1.50") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
