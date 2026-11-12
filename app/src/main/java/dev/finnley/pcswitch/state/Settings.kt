@@ -40,6 +40,19 @@ class Settings(context: Context) {
         get() = p.getString(K_PC_IP, DEF_PC_IP) ?: DEF_PC_IP
         set(v) { p.edit().putString(K_PC_IP, v.trim()).apply() }
 
+    /** Notification settings */
+    var notificationEnabled: Boolean
+        get() = p.getBoolean(K_NOTIFICATION_ENABLED, true)
+        set(v) { p.edit().putBoolean(K_NOTIFICATION_ENABLED, v).apply() }
+
+    var notificationMode: String
+        get() = p.getString(K_NOTIFICATION_MODE, "all") ?: "all"
+        set(v) { p.edit().putString(K_NOTIFICATION_MODE, v.trim()).apply() }
+
+    var notificationPcName: String
+        get() = p.getString(K_NOTIFICATION_PC_NAME, DEF_PC_NAME) ?: DEF_PC_NAME
+        set(v) { p.edit().putString(K_NOTIFICATION_PC_NAME, v.trim()).apply() }
+
     fun entitySet(): Set<String> = setOf(onEntity, offEntity).filter { it.isNotBlank() }.toSet()
 
     companion object {
@@ -52,10 +65,14 @@ class Settings(context: Context) {
         private const val K_VPN = "vpn_profile_id"
         private const val K_DONE = "setup_done"
         private const val K_PC_IP = "pc_ip"
+        private const val K_NOTIFICATION_ENABLED = "notification_enabled"
+        private const val K_NOTIFICATION_MODE = "notification_mode"
+        private const val K_NOTIFICATION_PC_NAME = "notification_pc_name"
         const val DEF_LAN = "192.168.0.205:8123"
         const val DEF_RELAY = "100.106.82.86"
         const val DEF_ON = "button.buro_wake_pc_buro"
         const val DEF_OFF = "input_button.pc_ausschalten"
         const val DEF_PC_IP = "192.168.0.57"
+        const val DEF_PC_NAME = "PC"
     }
 }

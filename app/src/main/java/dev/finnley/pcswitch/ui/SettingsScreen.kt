@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,6 +23,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +51,9 @@ fun SettingsScreen(
     offEntity: String,
     vpnProfileId: String,
     pcIp: String,
+    notificationEnabled: Boolean,
+    notificationMode: String,
+    notificationPcName: String,
     updateChecking: Boolean,
     updateAvailable: String?,
     updateNotes: String?,
@@ -54,6 +62,7 @@ fun SettingsScreen(
     hasPreviousVersion: Boolean,
     onBack: () -> Unit,
     onSave: (String, String, String, String, String, String, String) -> Unit,
+    onSaveNotificationSettings: (Boolean, String, String) -> Unit,
     onPcIpSave: (String) -> Unit,
     onCheckUpdate: () -> Unit,
     onDownloadUpdate: () -> Unit,
@@ -69,6 +78,9 @@ fun SettingsScreen(
     var editedOffEntity by remember { mutableStateOf(offEntity) }
     var editedVpnId by remember { mutableStateOf(vpnProfileId) }
     var editedPcIp by remember { mutableStateOf(pcIp) }
+    var editedNotificationEnabled by remember { mutableStateOf(notificationEnabled) }
+    var editedNotificationMode by remember { mutableStateOf(notificationMode) }
+    var editedNotificationPcName by remember { mutableStateOf(notificationPcName) }
 
     BackHandler { onBack() }
 
@@ -254,6 +266,101 @@ fun SettingsScreen(
                     "Direkte Erreichbarkeitsprüfung (TCP Port 22/80), unabhängig von Home Assistant.",
                     fontSize = 12.sp,
                     color = InkSoft
+                )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+
+        GothicCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                GothicLabel("Benachrichtigungen")
+                Spacer(Modifier.height(12.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "Benachrichtigungen aktivieren",
+                        fontSize = 14.sp,
+                        color = Ink,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = editedNotificationEnabled,
+                        onCheckedChange = { editedNotificationEnabled = it },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = Accent,
+                            checkedThumbColor = Color.White,
+                            uncheckedTrackColor = SurfaceAlt,
+                            uncheckedThumbColor = InkSoft
+                        )
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Benachrichtigungsmode", fontSize = 13.sp, color = InkSoft)
+                Spacer(Modifier.height(8.dp))
+
+                val modes = listOf("all", "boot_only", "shutdown_only")
+                val modeLabels = mapOf(
+                    "all" to "Alle Statusänderungen",
+                    "boot_only" to "Nur beim Starten",
+                    "shutdown_only" to "Nur beim Abschalten"
+                )
+
+                modes.forEach { mode ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        RadioButton(
+                            selected = editedNotificationMode == mode,
+                            onClick = { editedNotificationMode = mode },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = Accent,
+                                unselectedColor = InkSoft
+                            )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            modeLabels[mode] ?: mode,
+                            fontSize = 13.sp,
+                            color = Ink
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                GothicOutlinedTextField(
+                    value = editedNotificationPcName,
+                    onValueChange = { editedNotificationPcName = it },
+                    label = { Text("PC-Name") },
+                    placeholder = { Text("PC") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Name, der in Benachrichtigungen angezeigt wird.",
+                    fontSize = 12.sp,
+                    color = InkSoft
+                )
+
+                Spacer(Modifier.height(12.dp))
+                GothicButton(
+                    text = "Benachrichtigungen speichern",
+                    onClick = {
+                        onSaveNotificationSettings(
+                            editedNotificationEnabled,
+                            editedNotificationMode,
+                            editedNotificationPcName
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
