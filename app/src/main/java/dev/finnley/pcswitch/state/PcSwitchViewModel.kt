@@ -1049,16 +1049,32 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         ): EntitySnapshot {
             val switchStates = switches.associate { sw ->
                 val state = when {
-                    sw.stateEntity.isNotBlank() -> entityStates[sw.stateEntity] ?: "unknown"
-                    else -> entityStates[sw.primaryEntity] ?: "unknown"
+                    sw.stateEntity.isNotBlank() -> entityStates[sw.stateEntity]
+                    else -> entityStates[sw.primaryEntity]
                 }
-                sw.id to state
+                sw.id to normalizeState(state)
             }
             return EntitySnapshot(
                 switchStates = switchStates,
                 onState = entityStates[onEntity] ?: "unknown",
                 offState = entityStates[offEntity] ?: "unknown"
             )
+        }
+
+        /**
+         * B3: Normalisiert rohe HA-States auf "on" | "off" | "unknown".
+         * Alles, was kein erkennbarer Power-Status ist (z. B. ISO-Timestamps
+         * von input_button-Entities ohne StateEntity, "unavailable",
+         * Sensor-Strings), wird "unknown" — die UI blendet die Statuszeile
+         * dann aus, statt den Rohwert zu displayen.
+         */
+        fun normalizeState(raw: String?): String {
+            val v = raw?.trim()?.lowercase() ?: "unknown"
+            return when (v) {
+                "on", "true", "1", "active", "connected" -> "on"
+                "off", "false", "0", "inactive", "disconnected" -> "off"
+                else -> "unknown"
+            }
         }
 
         /**
