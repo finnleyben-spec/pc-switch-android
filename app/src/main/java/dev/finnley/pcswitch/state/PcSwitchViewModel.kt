@@ -687,6 +687,12 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) { checkPcStatus() }
     }
 
+    fun saveNotificationSettings(enabled: Boolean, mode: String, pcName: String) {
+        settings.notificationEnabled = enabled
+        settings.notificationMode = mode
+        settings.notificationPcName = pcName
+    }
+
     /**
      * Kombiniert PC-Status (R7/R8): HA-StateEntity (primary) + TCP-Fallback
      * -> genau "on" | "off" via PcStatusResolver. Ohne StateEntity rein TCP.
@@ -954,7 +960,11 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         for (sw in switches) {
             val newState = snap.switchStates[sw.id]
             if (newState != null && newState != "unknown" && newState != current.switchStates[sw.id]) {
-                NotificationHelper.sendSwitchNotification(ctx, sw.name, newState, sw.id)
+                val isPcSwitch = sw.name.lowercase().contains("pc")
+                val pcToggleState = st.pcToggleState
+                if (shouldNotify(settings.notificationEnabled, settings.notificationMode, isPcSwitch, pcToggleState, newState)) {
+                    NotificationHelper.sendSwitchNotification(ctx, sw.name, newState, sw.id, settings.notificationPcName)
+                }
             }
         }
 
@@ -1031,6 +1041,34 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val TAG = "PcSwitchViewModel"
+
+        /**
+         * Soll eine Benachrichtigung für einen Switch-State-Wechsel gesendet werden?
+         * - notificationEnabled muss true sein
+         * - PC-Switches: abhängig von notificationMode (all/boot_only/shutdown_only)
+         *   und pcToggleState (booting/shutting_down)
+         * - Nicht-PC-Switches: immer benachrichtigen
+         * Pure Funktion (testbar ohne Android-Runtime).
+         */
+        fun shouldNotify(
+            notificationEnabled: Boolean,
+            notificationMode: String,
+            isPcSwitch: Boolean,
+            pcToggleState: String,
+            newState: String
+        ): Boolean {
+            if (!notificationEnabled) return false
+
+            // Nicht-PC-Switches: immer benachrichtigen
+            if (!isPcSwitch) return true
+
+            // PC-Switches: abhängig von Mode und Transition-State
+            return when (notificationMode) {
+                "boot_only" -> pcToggleState == "booting" && newState == "on"
+                "shutdown_only" -> pcToggleState == "shutting_down" && newState == "off"
+                else -> true // "all" oder unknown
+            }
+        }
 
         /** Heartbeat-Intervall: identische Snapshots werden trotzdem 1x/30s
          *  emittiert, damit lastUpdate frisch bleibt (R5). */

@@ -63,7 +63,8 @@ object NotificationHelper {
         context: Context,
         switchName: String,
         newState: String,
-        switchId: String? = null
+        switchId: String? = null,
+        pcName: String = "PC"
     ) {
         if (!hasPermission(context)) {
             Toast.makeText(
@@ -80,6 +81,13 @@ object NotificationHelper {
             "on" -> "AN"
             "off" -> "AUS"
             else -> newState
+        }
+
+        val isPcSwitch = switchName.lowercase().contains("pc")
+        val title = if (isPcSwitch) {
+            "$pcName ist jetzt $stateText"
+        } else {
+            "$switchName: $stateText"
         }
 
         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.GERMANY).format(Date())
@@ -99,7 +107,7 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_power)
-            .setContentTitle("${switchName}: ${stateText}")
+            .setContentTitle(title)
             .setContentText("Schalter-Zustand geändert um $timestamp")
             .setWhen(System.currentTimeMillis())
             .setContentIntent(pendingIntent)
