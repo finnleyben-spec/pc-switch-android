@@ -86,3 +86,37 @@ Vorher: ON ok, OFF fehlte (0.2 s), mit 1.1 s Pause ok.
 - **TestWallbox:** dual, primary=`input_button.pc_switch_test_on`,
   secondary=`input_button.pc_switch_test_off`,
   stateEntity=`input_boolean.test_wallbox_switch`.
+
+## 6. E2E-Verifizierung abgeschlossen (2026-11-12, AVD `pcswitch`, HA 192.168.0.205:8123)
+
+**B4 (0.2-s-Schnelltoggle): PASS** — exakt nach §2 (swipe ON 400ms → sleep 0.2 →
+swipe OFF 400ms, TestWallbox y=1819). Live-State-Sampling (100ms):
+off (0.0s) → on (0.8s) → off (1.4s). Logcat: beide Presses bestätigt
+(`press(input_button.pc_switch_test_on)` 19:23:51.333,
+`press(input_button.pc_switch_test_off)` 19:23:51.997, Δ=664ms).
+Hinweis: das erste „FAIL“ um 19:19 war ein Test-Setup-Fehler, kein App-Bug — der
+Carousel stand auf der TestB4-Karte (keine secondary-Entity), der OFF-Drag hatte
+nichts zu drücken. Auf der richtigen Karte läuft die Doku-Sequenz deterministisch.
+
+**B3 (State-Entity unbekannt): PASS** — TestB4 (ohne stateEntity) zeigt
+„Unbekannt“ in der UI (UI-Dump 2026-11-12 19:2x).
+
+**Regressions: 9/9 PASS** (Skript `regressions.py`, 2026-11-12 ~19:3x):
+- Einzel-ON TestWallbox: press(test_on) + Helper → on.
+- Einzel-OFF TestWallbox: press(test_off) + Helper → off.
+- Drag OHNE Crossing 0.5: kein Press, Knob snappt zurück, State unverändert.
+- TestB4 Einzel-ON: press(test_on) bestätigt; OFF-Drag (kein secondary) →
+  kein press(test_off), kein Crash (PID unverändert).
+- Carousel-Swipe beide Richtungen (TestWallbox ↔ TestB4) weiterhin möglich.
+- `transitioning=true`: nur statisch verifiziert (`pointerInput`-Key `transitioning` +
+  `if (enabled && !transitioning)`-Guard in EntityToggle.kt) — mit den Test-Fixtures
+  nicht auslösbar (isPcSwitch=false für TestWallbox/TestB4).
+
+**Unit-Tests:** `./gradlew testDebugUnitTest` → 100 Tests, 0 Failures, 0 Errors,
+0 Skipped (2026-11-12; Handover hatte 75 — Suite ist seither gewachsen).
+
+**Debug-Logs:** `PcSwitchDebug` nicht mehr auf main (grep: 0 Treffer) —
+Punkt 3 erledigt (Removal war Teil des merged v2.10.0).
+
+**Auslieferung:** v2.10.0 merged nach main + GitHub-Release veröffentlicht
+(2026-11-12, siehe T553).
