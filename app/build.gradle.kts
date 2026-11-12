@@ -12,8 +12,8 @@ android {
         applicationId = "dev.finnley.pcswitch"
         minSdk = 26
         targetSdk = 35
-        versionCode = 76
-        versionName = "2.9.1"
+        versionCode = 77
+        versionName = "2.10.0"
     }
 
     buildTypes {
