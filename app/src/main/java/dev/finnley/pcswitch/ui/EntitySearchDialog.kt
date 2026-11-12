@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
@@ -37,7 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.finnley.pcswitch.ha.HaClient.EntityState
-import kotlinx.coroutines.delay
 
 /**
  * Entity search dialog — lets users search and select HA entities by name or ID.
@@ -53,17 +53,11 @@ fun EntitySearchDialog(
     onSelect: (String) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    var selectedDomain by remember { mutableStateOf("all") }
 
-    // Filter entities by query (debounced in ViewModel)
-    val filtered = remember(query, entities) {
-        if (query.isBlank()) {
-            entities
-        } else {
-            entities.filter { e ->
-                e.entityId.contains(query, ignoreCase = true) ||
-                e.friendlyName.contains(query, ignoreCase = true)
-            }
-        }
+    // Filter entities by domain and query
+    val filtered = remember(query, entities, selectedDomain) {
+        filterEntities(entities, query, selectedDomain)
     }
 
     Box(
@@ -127,6 +121,32 @@ fun EntitySearchDialog(
                 }
             }
 
+            // Domain filter chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+            ) {
+                DOMAIN_FILTERS.forEach { domain ->
+                    val selected = selectedDomain == domain
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (selected) Accent else Surface)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .clickable { selectedDomain = domain }
+                    ) {
+                        Text(
+                            text = if (domain == "all") "Alle" else domain,
+                            color = if (selected) Bg else InkSoft,
+                            fontSize = 11.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+
             // Content
             when {
                 loading -> {
@@ -170,6 +190,8 @@ fun EntitySearchDialog(
 
 @Composable
 private fun EntityItem(entity: EntityState, onClick: () -> Unit) {
+    val state = normalizeStateForDisplay(entity.state)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -206,5 +228,31 @@ private fun EntityItem(entity: EntityState, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
         }
+        Spacer(Modifier.width(8.dp))
+        // State indicator
+        EntityStateIndicator(state)
+    }
+}
+
+@Composable
+private fun EntityStateIndicator(state: String) {
+    val (color, label) = when (state) {
+        "on" -> Pair(Color(0xFF4CAF50), "ON")
+        "off" -> Pair(InkSoft.copy(alpha = 0.4f), "OFF")
+        "unknown" -> Pair(InkSoft.copy(alpha = 0.2f), "?")
+        else -> Pair(InkSoft.copy(alpha = 0.4f), state.uppercase())
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.15f))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = label,
+            color = color,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
