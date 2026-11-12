@@ -510,6 +510,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         if (st.switches.isEmpty()) return
         val next = (st.currentSwitchIndex + 1) % st.switches.size
         _state.update { it.copy(currentSwitchIndex = next) }
+        refreshStatus()
     }
 
     fun prevSwitch() {
@@ -517,6 +518,7 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
         if (st.switches.isEmpty()) return
         val prev = (st.currentSwitchIndex - 1 + st.switches.size) % st.switches.size
         _state.update { it.copy(currentSwitchIndex = prev) }
+        refreshStatus()
     }
 
     fun setSwitchIndex(index: Int) {
@@ -526,6 +528,18 @@ class PcSwitchViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 st
             }
+        }
+    }
+
+    /**
+     * Swipe-triggered refresh: immediately re-emit entity states from the
+     * active HA session and run a fresh PC status check, so the user sees
+     * current state of the new switch without waiting for the 15s interval.
+     */
+    private fun refreshStatus() {
+        viewModelScope.launch(Dispatchers.IO) {
+            emitEntityStates()
+            checkPcStatus()
         }
     }
 
