@@ -14,7 +14,7 @@ android {
         applicationId = "dev.finnley.pcswitch"
         minSdk = 26
         targetSdk = 36
-        versionCode = 78
+        versionCode = 79
         versionName = "3.0.0-alpha.1"
     }
 

@@ -57,24 +57,35 @@ echo "[4/10] Building APK (assembleRelease)..."
 echo "  Build complete"
 
 UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
-
-# Step 5: Zipalign APK
-echo "[5/10] Zipaligning APK..."
-ALIGNED="app/build/outputs/apk/release/app-release-aligned.apk"
-"$ZIPALIGN" -f -v 4 "$UNSIGNED" "$ALIGNED"
-echo "  APK aligned"
-
-# Step 6: Sign APK
-echo "[6/10] Signing APK..."
-UNSIGNED="$ALIGNED"
+GRADLE_SIGNED="app/build/outputs/apk/release/app-release.apk"
 SIGNED="app/build/outputs/apk/release/pc-switch-android-v${VERSION_NAME}.apk"
-"$APPSIGNER" sign \
-    --ks "$KEYSTORE" \
-    --ks-key-alias "$KEY_ALIAS" \
-    --ks-pass "pass:$KEY_PASS" \
-    --key-pass "pass:$KEY_PASS" \
-    --out "$SIGNED" "$UNSIGNED"
-echo "  APK signed: $SIGNED"
+
+# Step 5+6: Zipalign + Sign (oder Verifikation, wenn Gradle direkt signiert)
+if [ -f "$UNSIGNED" ] && "$ZIPALIGN" -c -v 4 "$UNSIGNED" >/dev/null 2>&1; then
+    echo "[5/10] Zipaligning APK..."
+    ALIGNED="app/build/outputs/apk/release/app-release-aligned.apk"
+    "$ZIPALIGN" -f -v 4 "$UNSIGNED" "$ALIGNED"
+    echo "  APK aligned"
+    echo "[6/10] Signing APK..."
+    "$APPSIGNER" sign \
+        --ks "$KEYSTORE" \
+        --ks-key-alias "$KEY_ALIAS" \
+        --ks-pass "pass:$KEY_PASS" \
+        --key-pass "pass:$KEY_PASS" \
+        --out "$SIGNED" "$ALIGNED"
+    echo "  APK signed: $SIGNED"
+elif [ -f "$GRADLE_SIGNED" ]; then
+    # v3-Pfad: build.gradle.kts hat signingConfig -> assembleRelease liefert direkt signierte,
+    # aligned APK (AGP alignt beim Packaging). Verifizieren und unter dem Asset-Namen kopieren.
+    echo "[5/10] Gradle hat direkt signiert (signingConfig) -> Signature + Alignment pruefen..."
+    "$APPSIGNER" verify --print-certs "$GRADLE_SIGNED"
+    "$ZIPALIGN" -c -v 4 "$GRADLE_SIGNED" >/dev/null
+    cp "$GRADLE_SIGNED" "$SIGNED"
+    echo "  APK (Gradle-signed): $SIGNED"
+else
+    echo "  ERROR: Weder unsigned- noch signierte Release-APK gefunden!"
+    exit 1
+fi
 
 # Step 7: Verify signature
 echo "[7/10] Verifying APK signature..."
@@ -83,7 +94,7 @@ echo "  Signature valid"
 
 # Step 8: Verify version info in APK
 echo "[8/10] Verifying version info in APK..."
-APK_VERSION_NAME=$("$AAPT" dump badging "$SIGNED" | grep "package:" | grep -oP "versionName='\K[0-9.]+")
+APK_VERSION_NAME=$("$AAPT" dump badging "$SIGNED" | grep "package:" | grep -oP "versionName='\K[^']+")
 APK_VERSION_CODE=$("$AAPT" dump badging "$SIGNED" | grep "package:" | grep -oP "versionCode='\K[0-9]+")
 echo "  APK versionName: $APK_VERSION_NAME"
 echo "  APK versionCode: $APK_VERSION_CODE"
