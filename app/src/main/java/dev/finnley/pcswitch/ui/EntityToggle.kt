@@ -151,8 +151,6 @@ fun EntityToggle(
                 if (w > 0f && toggleWidth != w.dp) {
                     toggleWidth = w.dp
                 }
-                android.util.Log.d("PcSwitchDebug",
-                    "EntityToggle BOUNDS rootPos=${coords.localToRoot(androidx.compose.ui.geometry.Offset.Zero)} size=${coords.size} isOn=$isOn")
             }
             .pointerInput(enabled, toggleWidth, transitioning) {
                 if (enabled && !transitioning) {
@@ -173,15 +171,11 @@ fun EntityToggle(
                             isDragging = true
                             dragBase = if (isOnState.value) 1f else 0f
                             dragStartX = pos.x
-                            android.util.Log.d("PcSwitchDebug",
-                                "EntityToggle onDragStart enabled=$enabled transitioning=$transitioning isOn=${isOnState.value} dragBase=$dragBase startX=${pos.x} travel=$travel")
                         },
                         onDrag = { change, _ ->
                             change.consume()
                             if (hasSwitched) return@detectDragGestures
                             val fingerP = dragBase + (change.position.x - dragStartX) / travel
-                            android.util.Log.d("PcSwitchDebug",
-                                "EntityToggle onDrag fingerP=$fingerP dragBase=$dragBase")
 
                             // Visual: knob follows the finger directly.
                             animProgress = fingerP.coerceIn(0f, 1f)
