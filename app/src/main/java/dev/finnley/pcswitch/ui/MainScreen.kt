@@ -1,6 +1,7 @@
 package dev.finnley.pcswitch.ui
 
 import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.Crossfade
@@ -14,6 +15,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -265,7 +267,7 @@ fun MainScreen(
         Spacer(Modifier.height(18.dp))
 
         // ---------- Switch Carousel ----------
-        Box(Modifier.weight(1f).alpha(carouselAlpha)) {
+        Box(Modifier.weight(1f).alpha(carouselAlpha).focusable(true)) {
             if (currentSwitch != null) {
                 SwitchCarousel(
                     switch = currentSwitch,
@@ -315,6 +317,7 @@ fun MainScreen(
                     .clip(RoundedCornerShape(0.dp, 16.dp, 0.dp, 0.dp))
                     .background(Surface.copy(alpha = 0.4f))
                     .padding(horizontal = 12.dp, vertical = 14.dp)
+                    .focusable(true)
                     .clickable(onClick = onSettings)
             ) {
                 Text("Einstellungen", fontSize = 13.sp, color = InkSoft)
@@ -326,6 +329,7 @@ fun MainScreen(
                     .clip(RoundedCornerShape(16.dp, 0.dp, 0.dp, 0.dp))
                     .background(Surface.copy(alpha = 0.4f))
                     .padding(horizontal = 12.dp, vertical = 14.dp)
+                    .focusable(true)
                     .clickable(onClick = onSwitches)
             ) {
                 Text("Switches", fontSize = 13.sp, color = InkSoft)

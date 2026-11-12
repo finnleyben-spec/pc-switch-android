@@ -6,19 +6,38 @@ plugins {
 
 android {
     namespace = "dev.finnley.pcswitch"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "dev.finnley.pcswitch"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 77
         versionName = "2.10.0"
     }
 
+    // Release signing config
+    signingConfigs {
+        create("release") {
+            val keystoreFile = rootDir.resolve("pcswitch-release.keystore")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = "pcswitch2026"
+                keyAlias = "pcswitch"
+                keyPassword = "pcswitch2026"
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     testOptions {
@@ -62,6 +81,8 @@ dependencies {
     implementation("androidx.datastore:datastore:1.1.1")
     // EncryptedSharedPreferences für Token-Speicherung (security audit)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // Baseline profiles for improved startup performance
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     // Tests
     testImplementation("junit:junit:4.13.2")
